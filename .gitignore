@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local environment
+.env
+
+# Downloaded corpora, indexes and run artifacts. Never commit these.
+artifacts/**
+!artifacts/**/
+!artifacts/**/.gitkeep
+
+# Benchmark data stays local until the repository policy is decided.
+data/benchmark/qrels/*
+!data/benchmark/qrels/.gitkeep
+data/annotations/**
+!data/annotations/**/
+!data/annotations/**/.gitkeep
+
+# Logs and OS noise
+*.log
+.DS_Store
