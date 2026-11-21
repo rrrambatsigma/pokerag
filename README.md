@@ -9,7 +9,7 @@ retrieval index is built once, outside this repository, then imported here.
 | Milestone | Isi | Status |
 | --- | --- | --- |
 | M0 | import artefak, verifikasi hash, cek tiga koleksi | selesai |
-| M1 | retrieval BM25 + dense + fusion | belum |
+| M1 | retrieval BM25 + dense + fusion | kode selesai, belum dijalankan di GPU |
 | M2 | harness evaluasi qrels | belum |
 | M3 | B0-B2 | belum |
 | M4 | B3-B4 | belum |
@@ -53,6 +53,23 @@ fixed          chunks_fixed          11642   11642   ok
 heading        chunks_heading        27902   27902   ok
 hierarchical   chunks_hierarchical   28786   28786   ok
 ```
+
+## Retrieval
+
+```bash
+uv sync --extra ml          # sekali, memasang torch dan sentence-transformers
+uv run pokerag retrieve "Apa tipe Cloyster?" --strategy fixed --mode hybrid -k 5
+uv run pokerag retrieve "Apa nama Jepang Raikou?" --mode bm25 -k 5
+```
+
+`--mode bm25` tidak memuat model dan bisa jalan tanpa GPU. `dense` dan `hybrid`
+memuat `BAAI/bge-m3` (revisi dipin) untuk mengubah query menjadi vektor 1024
+dimensi. `--strategy` memilih koleksi: `fixed` untuk tangga B2-B4, `heading`
+dan `hierarchical` untuk A1.
+
+Tokenizer BM25 dikunci ke konfigurasi build: `stopwords=None` dan tanpa
+stemming. Menggunakan default bm25s akan membuang "the" dan menggeser id token,
+sehingga skor tidak lagi sebanding dengan index.
 
 ## Dokumen
 
