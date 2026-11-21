@@ -1,0 +1,7 @@
+Example 1
+Question: What is the catch rate of Pikachu?
+{"answer": "Not enough evidence.", "citations": [], "abstain": true}
+
+Example 2
+Question: What type is Pikachu?
+{"answer": "Pikachu is an Electric-type Pokemon.", "citations": [], "abstain": false}

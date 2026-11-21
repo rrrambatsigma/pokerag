@@ -1,0 +1,108 @@
+# Tangga konfigurasi B0-B6.
+#
+# B0 sampai B5 wajib memakai base model yang sama. Revisi di-pin saat model
+# pertama kali diunduh; sebelum itu nilainya null dan run tidak boleh dimulai.
+# B6 dibandingkan dengan parent B4, bukan dengan B0.
+#
+# Catatan: nilai "off" harus dikutip. YAML 1.1 membacanya sebagai boolean false.
+#
+# Prompt:
+# - B0/B1 tidak memakai evidence, jadi user prompt hanya berisi {question}.
+# - B2 sampai B6 memakai grounded prompt dengan {evidence} dan {question}.
+# - B1 menambahkan few-shot, constraint, skema output, dan policy abstain.
+
+base_model:
+  model_id: Qwen/Qwen2.5-1.5B-Instruct
+  revision: null
+  dtype: float16
+  device: cuda
+
+sampling:
+  temperature: 0.2
+  top_p: 0.9
+  max_new_tokens: 512
+  seeds: [7, 17, 27]
+
+configs:
+  B0:
+    system_prompt: configs/prompts/b0_system.txt
+    user_prompt: configs/prompts/plain_user.txt
+    retrieval:
+      mode: "off"
+      strategy: fixed
+      top_k: 5
+    notes: "Model polos, tanpa retrieval, tanpa tool."
+
+  B1:
+    system_prompt: configs/prompts/b1_system.txt
+    user_prompt: configs/prompts/plain_user.txt
+    fewshot: configs/prompts/b1_fewshot.txt
+    retrieval:
+      mode: "off"
+      strategy: fixed
+      top_k: 5
+    notes: "Few-shot, constraint, skema output, dan policy abstain, tetap tanpa retrieval."
+
+  B2:
+    system_prompt: configs/prompts/grounded_system.txt
+    user_prompt: configs/prompts/grounded_user.txt
+    retrieval:
+      mode: dense
+      strategy: fixed
+      top_k: 5
+    notes: "RAG sederhana: dense retrieval, potongan tetap, top-k."
+
+  B3:
+    system_prompt: configs/prompts/grounded_system.txt
+    user_prompt: configs/prompts/grounded_user.txt
+    retrieval:
+      mode: hybrid
+      strategy: fixed
+      top_k: 5
+    reranker: true
+    notes: "BM25 + fusion + reranker + filter metadata, chunking sama dengan B2."
+
+  B4:
+    system_prompt: configs/prompts/grounded_system.txt
+    user_prompt: configs/prompts/grounded_user.txt
+    retrieval:
+      mode: hybrid
+      strategy: fixed
+      top_k: 5
+    reranker: true
+    planner: true
+    sufficiency: true
+    verifier: true
+    notes: "B3 ditambah query planner, skor kecukupan evidence, retry terbatas, verifier, dan abstain."
+
+  B5:
+    system_prompt: configs/prompts/grounded_system.txt
+    user_prompt: configs/prompts/grounded_user.txt
+    retrieval:
+      mode: hybrid
+      strategy: fixed
+      top_k: 5
+    reranker: true
+    planner: true
+    sufficiency: true
+    verifier: true
+    adapter:
+      enabled: false
+      reason: "allow_ft_training=false untuk 386 dokumen; butuh dataset berlisensi lain atau B5 dinyatakan tidak dijalankan."
+    notes: "B4 dengan adapter LoRA/QLoRA pada base yang sama, bila lisensi mengizinkan."
+
+  B6:
+    system_prompt: configs/prompts/grounded_system.txt
+    user_prompt: configs/prompts/grounded_user.txt
+    retrieval:
+      mode: hybrid
+      strategy: fixed
+      top_k: 5
+    reranker: true
+    planner: true
+    sufficiency: true
+    verifier: true
+    tools:
+      - document_version
+      - generation_check
+    notes: "B4 dengan tool call terstruktur dan pengecekan versi atau generasi. Parent: B4."
