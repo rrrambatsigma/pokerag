@@ -19,3 +19,6 @@ dist/
 artifacts/**
 data/tmp/
 *.parquet
+
+# Test qrels stay local until the benchmark is released
+data/benchmark/qrels/test*.jsonl

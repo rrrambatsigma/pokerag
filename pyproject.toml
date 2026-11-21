@@ -34,6 +34,7 @@ pokerag-ingest = "pokerag.ingest.cli:main"
 pokerag-chunk = "pokerag.chunking.cli:main"
 pokerag-index = "pokerag.index.cli:main"
 pokerag-retrieve = "pokerag.retrieval.cli:main"
+pokerag-eval = "pokerag.eval.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
