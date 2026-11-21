@@ -256,6 +256,33 @@ Metrik otomatis: `abstain_correct`, `false_confident`, `false_refusal`,
 unanswerable. Tanpa `--judgments`, metrik dinilai ditulis `n/a` dan dikeluarkan
 dari rata-rata, bukan dianggap nol. Rinciannya di ADR-0012.
 
+## Run manifest
+
+Setiap angka harus bisa ditelusuri ke keadaan yang menghasilkannya:
+
+```python
+from pokerag.bench.manifest import (
+    ModelSpec, RequestRecord, SamplingSpec, build_manifest, write_run,
+)
+
+manifest = build_manifest(
+    run_set="b3", run_index=0,
+    snapshot="pokerag-corpus-v2", index_version=retriever.index_version,
+    strategy="heading", mode="hybrid",
+    config_path="configs/retrieval.v2.yaml", prompt_path="configs/prompts/b3.txt",
+    qrels_path="data/benchmark/qrels/test.jsonl", queries_path="queries.csv",
+    model=ModelSpec("Qwen/Qwen2.5-1.5B-Instruct", revision, "float16", "cuda"),
+    sampling=SamplingSpec(0.2, 0.9, 512, seed=7),
+)
+write_run("artifacts/runs", manifest, records)
+```
+
+Menghasilkan `artifacts/runs/<run_id>/manifest.json` dan `requests.jsonl`.
+Manifest mencatat commit dan status dirty, hash config, prompt, qrels, dan query
+set, `snapshot`, `index_version`, model, revisi, sampling, dan seed. Rangkuman
+latensi p50/p95 serta token dihitung dari trace, dan nilai yang tidak diukur
+ditulis `null`, bukan nol. Rinciannya di ADR-0013.
+
 ## API
 
 UI memakai proxy Vite (`/api` → `127.0.0.1:8000`), jadi cukup jalankan dua
