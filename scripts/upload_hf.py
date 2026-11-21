@@ -5,7 +5,7 @@ calling ``upload_file`` 650 times would create 650 commits and be painfully
 slow. Files are hard-linked (same volume) into a mirrored layout, then uploaded
 in one commit. Hard links cost no extra disk space.
 
-Layout uploaded (v2)
+Layout uploaded (v3)
 --------------------
 ``register.parquet``, ``documents.parquet``, ``cleaned.jsonl``, ``chunks/*``,
 ``embeddings/*``, ``raw/wikitext/*``, ``raw/html/*``, ``indexes.tar.gz`` (one
@@ -14,10 +14,15 @@ per-collection index manifests, embedder identity, provenance),
 ``reports/*`` (A1 table and model identity, committed copies), ``README.md``
 (dataset card), ``INTEGRITY.sha256``.
 
+The corpus snapshot is selectable: ``--snapshot pokerag-corpus-v2`` (default).
+This matters because the snapshot holds the documents/chunks/raw files while
+``artifacts/indexes`` holds the built index; pointing both at the same corpus
+is what makes the backup consistent.
+
 Usage
 -----
-    python scripts/upload_hf.py --version v2 --dry-run
-    python scripts/upload_hf.py --version v2
+    python scripts/upload_hf.py --version v3 --dry-run
+    python scripts/upload_hf.py --version v3
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ from pathlib import Path
 from huggingface_hub import HfApi
 
 ARTIFACTS = Path("artifacts")
-SNAPSHOT = ARTIFACTS / "corpus" / "pokerag-corpus-v1"
+SNAPSHOT = ARTIFACTS / "corpus" / "pokerag-corpus-v2"
 STAGING = ARTIFACTS / "hf_staging"
 CARD_NAME = "README.md"
 
@@ -208,7 +213,11 @@ def used_embedding_files(manifests: dict[str, dict]) -> list[str]:
 
 
 def build_card(
-    version: str, identity: dict | None, manifests: dict[str, dict], embedding_files: list[str]
+    version: str,
+    identity: dict | None,
+    manifests: dict[str, dict],
+    embedding_files: list[str],
+    documents: int,
 ) -> str:
     title = f"PokeRAG Corpus {version}"
     return "\n".join(
@@ -277,7 +286,7 @@ def build_card(
             "| Path | Description |",
             "|---|---|",
             "| `register.parquet` | one row per fetched page: pageid, revid, timestamp, hashes, licence |",
-            "| `documents.parquet` | 320 cleaned documents with section spans and infobox facts |",
+            "| `documents.parquet` | " + str(documents) + " cleaned documents with section spans and infobox facts |",
             "| `cleaned.jsonl` | same documents in JSONL, including cleaner version |",
             "| `chunks/fixed.parquet` | sliding window 2048 chars / 256 overlap (baseline B2) |",
             "| `chunks/heading.parquet` | heading-aware, 1200 chars, 120 overlap, min 240 |",
@@ -360,8 +369,8 @@ def build_staging(version: str) -> list[Path]:
     add(ARTIFACTS / "indexes" / "index_report.md", "manifests/index_report.md")
     add(ARTIFACTS / "indexes" / "provenance.json", "manifests/build_provenance.json")
     add(ARTIFACTS / "models" / "embedder_identity.json", "manifests/embedder_identity.json")
-    stage_log(ARTIFACTS / "index_v2_build.log", "manifests/index_build.log", files)
-    stage_log(ARTIFACTS / "index_gpu_build.log", "manifests/index_gpu_build_legacy.log", files)
+    stage_log(ARTIFACTS / "index_gpu_v2_build.log", "manifests/index_build.log", files)
+    stage_log(ARTIFACTS / "index_v2_build.log", "manifests/index_build_v1_legacy.log", files)
 
     for path in sorted((SNAPSHOT / "chunks").glob("*.parquet")):
         add(path, f"chunks/{path.name}")
@@ -382,7 +391,7 @@ def build_staging(version: str) -> list[Path]:
 
     add(pack_indexes(), "indexes.tar.gz")
 
-    card = build_card(version, _identity(), manifests, embedding_files)
+    card = build_card(version, _identity(), manifests, embedding_files, document_count())
     (STAGING / CARD_NAME).write_text(card, encoding="utf-8")
     files.append(STAGING / CARD_NAME)
 
@@ -402,14 +411,31 @@ def _identity() -> dict | None:
     return read_json(path) if path.exists() else None
 
 
+def document_count() -> int:
+    """Rows in the frozen documents table, so the card cannot claim a stale count."""
+    import pyarrow.parquet as pq
+
+    return int(pq.read_metadata(SNAPSHOT / "documents.parquet").num_rows)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="v2", help="label and default repo suffix")
+    parser.add_argument("--version", default="v3", help="label and default repo suffix")
     parser.add_argument("--repo", default=None, help="default: meivawijaya/pokerag-corpus-<version>")
+    parser.add_argument(
+        "--snapshot",
+        default="pokerag-corpus-v2",
+        help="corpus snapshot under artifacts/corpus (default: pokerag-corpus-v2)",
+    )
     parser.add_argument("--public", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     repo = args.repo or f"meivawijaya/pokerag-corpus-{args.version}"
+
+    global SNAPSHOT
+    SNAPSHOT = ARTIFACTS / "corpus" / args.snapshot
+    if not SNAPSHOT.exists():
+        raise SystemExit(f"snapshot tidak ada: {SNAPSHOT}")
 
     api = HfApi()
     who = api.whoami()

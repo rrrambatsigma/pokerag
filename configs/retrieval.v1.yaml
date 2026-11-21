@@ -1,0 +1,29 @@
+# Retrieval v1 — dense (Qdrant) + BM25 (bm25s), digabung dengan RRF di Python.
+#
+# Tidak ada yang dibangun ulang di sini. File ini hanya memilih index mana yang
+# dibaca, berapa kandidat dari tiap retriever, dan bagaimana peringkatnya
+# digabung. `index:` menunjuk config yang membangun koleksi; guard akan menolak
+# query kalau identitas embedder atau isi chunk tidak lagi cocok.
+#
+# RRF: skor(chunk) = sum(weight / (rrf_k + rank)), rank mulai 1. Skor mentah
+# dense (cosine) dan BM25 tidak pernah dijumlahkan, karena skalanya berbeda.
+
+index: configs/index.gpu.yaml
+strategy: heading
+
+top_dense: 20        # kandidat dense yang masuk fusion
+top_bm25: 20         # kandidat BM25 yang masuk fusion
+top_k: 5             # hasil akhir yang dikembalikan
+rrf_k: 10            # dipilih di dev (30 query): k=60 membuat chunk BM25 peringkat
+                     # bawah menyalip hasil dense yang benar
+
+# Bobot 2:1 untuk dense. Diukur pada dev: recall@5 hybrid 0,967 -> 1,000 dan
+# MRR@5 0,882 -> 0,893. Tetap baseline, bukan klaim hybrid > dense (MRR dense
+# 0,907); lihat docs/experiments/B1-retrieval.md sebelum mengubah.
+weights:
+  dense: 2.0
+  bm25: 1.0
+
+# Default `pokerag-retrieve eval`.
+modes: [dense, bm25, hybrid]
+ks: [5, 10]

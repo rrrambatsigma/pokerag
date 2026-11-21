@@ -15,7 +15,7 @@ from pokerag.chunking.audit import write_report
 from pokerag.chunking.build import build
 from pokerag.chunking.config import load_chunking_config
 
-DEFAULT_CONFIG = "configs/chunking.v1.yaml"
+DEFAULT_CONFIG = "configs/chunking.v2.yaml"
 
 
 def cmd_build(cfg) -> int:

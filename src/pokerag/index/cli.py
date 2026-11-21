@@ -16,14 +16,14 @@ import sys
 from pathlib import Path
 
 from pokerag.core.jsonl import read_json
-from pokerag.index.bm25_index import load_bm25, search_bm25
-from pokerag.index.build import build_all, identity_hash, truncation_summary
+from pokerag.index.build import build_all, truncation_summary
 from pokerag.index.config import STRATEGIES, IndexConfig, load_index_config
 from pokerag.index.embedders import make_embedder
 from pokerag.index.identity import build_identity, load_identity, save_identity
-from pokerag.index.qdrant_store import make_client
+from pokerag.retrieval.config import RetrievalConfig
+from pokerag.retrieval.pipeline import Retriever
 
-DEFAULT_CONFIG = "configs/index.gpu.yaml"
+DEFAULT_CONFIG = "configs/index.gpu.v2.yaml"
 
 
 def _manifest(cfg: IndexConfig, strategy: str) -> dict:
@@ -60,43 +60,26 @@ def cmd_build(args) -> int:
 
 
 def cmd_search(args) -> int:
-    cfg = load_index_config(Path(args.config))
-    manifest = _manifest(cfg, args.strategy)
-    if manifest.get("embedder_identity_sha256") != identity_hash(cfg):
-        raise SystemExit(
-            f"koleksi `{manifest['collection']}` dibangun dengan embedder lain "
-            f"({manifest.get('embedder', {}).get('model')}, "
-            f"{manifest.get('embedder', {}).get('dimension')} dim). "
-            "Pakai config yang sama dengan saat build; vektor query tidak boleh beda model."
-        )
-    embedder = make_embedder(cfg.embedder)
-    vector = embedder.embed_query(args.query)
-
-    client = make_client(cfg.qdrant, cfg.qdrant_dir)
-    try:
-        dense = client.query_points(
-            collection_name=manifest["collection"], query=vector, limit=args.top
-        ).points
-    finally:
-        client.close()
-
-    bm25, chunk_ids = load_bm25(cfg.bm25_dir(args.strategy))
-    sparse = search_bm25(bm25, chunk_ids, args.query, k=args.top)
-
-    print(
-        f"koleksi {manifest['collection']} · index {manifest['index_version'][:12]} · "
-        f"{manifest['embedder']['model']} {manifest['embedder']['dimension']} dim"
+    """Debug entry point; the real query path lives in ``pokerag.retrieval``."""
+    load_index_config(Path(args.config))  # fail early on a malformed config
+    depth = max(args.top, 20)
+    retrieval = RetrievalConfig(
+        index=args.config,
+        strategy=args.strategy,
+        top_dense=depth,
+        top_bm25=depth,
+        top_k=args.top,
     )
-    print("\nDENSE:")
-    for hit in dense:
-        payload = hit.payload
+    with Retriever(retrieval) as retriever:
+        hits = retriever.search(args.query, mode=args.mode, top_k=args.top)
         print(
-            f"  {hit.score:.3f}  {payload['chunk_id']}  {payload['doc_id']}  "
-            f"{' > '.join(payload['heading_path'])[:60]}"
+            f"mode={args.mode} koleksi {retriever.collection} · index "
+            f"{retriever.index_version[:12]} · {len(hits)} hasil"
         )
-    print("\nBM25:")
-    for chunk_id, score in sparse:
-        print(f"  {score:.3f}  {chunk_id}")
+        for hit in hits:
+            ranks = " ".join(f"{source}#{rank}" for source, rank in sorted(hit.ranks.items()))
+            heading = " > ".join(hit.heading_path)[:60]
+            print(f"  {hit.rank:2d}. {hit.score:.4f}  {ranks:12s} {hit.doc_id}  {heading}")
     return 0
 
 
@@ -160,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
     search = sub.add_parser("search")
     search.add_argument("query")
     search.add_argument("--strategy", default="heading", choices=list(STRATEGIES))
+    search.add_argument("--mode", default="hybrid", choices=["dense", "bm25", "hybrid"])
     search.add_argument("--top", type=int, default=5)
 
     stats = sub.add_parser("stats")
@@ -169,6 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     identity.add_argument("--refresh", action="store_true", help="ukur ulang dari model yang dimuat")
 
     args = parser.parse_args(argv)
+    if hasattr(sys.stdout, "reconfigure"):
+        # Chunk text and headings are arbitrary Unicode; a cp1252 console must
+        # not turn a successful query into a UnicodeEncodeError.
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if args.command == "build":
         return cmd_build(args)
     if args.command == "search":

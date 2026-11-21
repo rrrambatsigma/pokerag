@@ -19,7 +19,7 @@
 | Tokenizer | `BAAI/bge-m3` |
 | Perangkat | NVIDIA GeForce RTX 3050 Laptop GPU (4.0 GiB) |
 | Runtime | cuda 12.4, sentence_transformers 6.3.0, torch 2.6.0+cu124 |
-| Chunk terpotong | 0 dari 58098 (maksimum 1005 token, batas 1024) |
+| Chunk terpotong | 0 dari 68330 (maksimum 1005 token, batas 1024) |
 
 ## Cara membacanya
 

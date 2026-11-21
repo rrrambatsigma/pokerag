@@ -33,6 +33,7 @@ gpu = ["torch>=2.2", "sentence-transformers>=3.0"]
 pokerag-ingest = "pokerag.ingest.cli:main"
 pokerag-chunk = "pokerag.chunking.cli:main"
 pokerag-index = "pokerag.index.cli:main"
+pokerag-retrieve = "pokerag.retrieval.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

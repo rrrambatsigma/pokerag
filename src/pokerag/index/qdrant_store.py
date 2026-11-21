@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Sequence
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import Distance, PointStruct, ScoredPoint, VectorParams
 
 from pokerag.core.logging import get_logger
 from pokerag.index.config import QdrantConfig
@@ -58,6 +58,26 @@ def upsert_points(
             )
         ]
         client.upsert(collection_name=name, points=chunk)
+
+
+def search_dense(
+    client: QdrantClient,
+    name: str,
+    vector: Sequence[float],
+    top_k: int = 10,
+    query_filter=None,
+) -> list[ScoredPoint]:
+    """Nearest neighbours for one query vector, highest score first."""
+    if top_k < 1:
+        raise ValueError("top_k harus >= 1")
+    return list(
+        client.query_points(
+            collection_name=name,
+            query=list(vector),
+            limit=top_k,
+            query_filter=query_filter,
+        ).points
+    )
 
 
 def collection_count(client: QdrantClient, name: str) -> int:

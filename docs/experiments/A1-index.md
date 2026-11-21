@@ -3,7 +3,7 @@
 > Dibuat otomatis oleh `pokerag-index build`; angka berasal dari manifest
 > yang hash-nya tercatat di tabel. Artefak besar ada di HF (v2), bukan di git.
 
-- snapshot: `pokerag-corpus-v1` — `5f898e4f98813909`
+- snapshot: `pokerag-corpus-v2` — `5eda7c8efc03f6fe`
 - embedder: `BAAI/bge-m3` @ `5617a9f61b028005a4858fdac845db406aefb181`, 1024 dim, float16, jendela 1024 token
 - database: satu Qdrant, 3 koleksi (chunks_fixed, chunks_heading, chunks_hierarchical)
 - vektor: L2-normalised, cosine, BM25 terpisah per koleksi
@@ -12,9 +12,9 @@
 
 | Strategi | Chunk | Titik | token p50 / p95 | max | ctx@k=5 | index size | build | cakupan teks | index_version |
 |---|---|---|---|---|---|---|---|---|---|
-| `fixed` | 9887 | 9887 | 597 / 781 | 1005 | 2985 | 106.4 MB | 666.6 s | 100.0% | 7c4119ca67a6 |
-| `heading` | 23767 | 23767 | 302 / 445 | 627 | 1510 | 244.3 MB | 901.9 s | 99.8% | a89abec5b5e5 |
-| `hierarchical` | 24444 | 24444 | 241 / 363 | 512 | 1205 | 251.8 MB | 894.1 s | 99.9% | ac96b8318278 |
+| `fixed` | 11642 | 11642 | 598 / 784 | 1005 | 2990 | 125.2 MB | 223.5 s | 100.0% | 75f6330e7f01 |
+| `heading` | 27902 | 27902 | 302 / 448 | 627 | 1510 | 286.7 MB | 329.9 s | 99.8% | fa5a8dafad1e |
+| `hierarchical` | 28786 | 28786 | 241 / 365 | 512 | 1205 | 296.4 MB | 351.3 s | 99.9% | 6df736f91d34 |
 
 ## Definisi
 
@@ -30,7 +30,7 @@
 | cakupan teks | proporsi dokumen yang tercakup minimal satu chunk (gabungan span) |
 | index_version | hash snapshot, chunk, strategi, identitas embedder, metrik jarak, BM25 |
 
-`hierarchical` juga menyimpan 13,410 baris parent untuk context expansion (tidak di-embed).
+`hierarchical` juga menyimpan 15,803 baris parent untuk context expansion (tidak di-embed).
 
 ## Tertunda (belum diukur, bukan nol)
 

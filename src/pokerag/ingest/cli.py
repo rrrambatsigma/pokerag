@@ -32,7 +32,7 @@ from pokerag.ingest.validate import run_validation
 
 logger = get_logger("pokerag.ingest.cli")
 
-DEFAULT_CONFIG = "configs/corpus.v1.yaml"
+DEFAULT_CONFIG = "configs/corpus.v2.yaml"
 
 
 def _transport(cfg: CorpusConfig) -> MediaWikiTransport:

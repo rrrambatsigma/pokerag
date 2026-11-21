@@ -1,0 +1,37 @@
+# Index GPU v2 — bge-m3 (1024 dim) over the Gen I-III corpus.
+#
+# Same embedder, dtype and window as v1 (configs/index.gpu.yaml). Only the
+# snapshot changes, so the embedding cache still serves every chunk whose text
+# did not change; the 66 new pages are the only new vectors.
+#
+# max_seq_length 1024: measured on v1, the longest chunk (fixed) is 1.005
+# tokens. The corpus grew, so the build re-checks the window and fails before
+# embedding if a new chunk exceeds it.
+
+snapshot: pokerag-corpus-v2
+strategies: [fixed, heading, hierarchical]
+artifacts_root: artifacts
+
+embedder:
+  provider: st
+  model: BAAI/bge-m3
+  revision: 5617a9f61b028005a4858fdac845db406aefb181
+  dimension: 1024
+  device: cuda
+  dtype: float16
+  max_seq_length: 1024
+  batch_size: 8
+  query_prefix: ""
+  items_per_minute: 0
+  max_retries: 1
+  timeout_seconds: 120
+
+qdrant:
+  mode: local
+  path: indexes/qdrant
+  distance: cosine
+  on_disk: true
+
+bm25:
+  k1: 1.2
+  b: 0.75

@@ -10,6 +10,9 @@ dist/
 # Secrets
 .env
 
+# Tool screenshots (OpenChamber browser panel)
+.openchamber/
+
 # Derived artifacts (corpus text, indexes, runs, adapters).
 # Bulbapedia content is CC BY-NC-SA 2.5: it is not redistributed through this repo.
 # Only source registers, hashes and reports are committed.
