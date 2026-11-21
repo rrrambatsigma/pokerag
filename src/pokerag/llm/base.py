@@ -16,6 +16,9 @@ class Answer:
     text: str
     cited_chunk_ids: tuple[str, ...] = ()
     abstained: bool = False
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    raw: str | None = None
 
 
 class Generator(Protocol):

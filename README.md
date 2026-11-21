@@ -324,6 +324,35 @@ selalu abstain dan baseline kehilangan makna. B2 ke atas memakai evidence
 bernomor `[n]` dan prompt memperlakukan evidence sebagai data, bukan instruksi.
 Rinciannya di ADR-0015.
 
+### Menjalankan generator
+
+```bash
+uv sync --extra gpu
+pokerag-generate --variant B2 --queries queries.csv --limit 5
+pokerag-generate --variant B0 --queries queries.csv --run-index 1
+```
+
+Keluaran ada di `artifacts/runs/<variant>-r<index>/`:
+
+| File | Isi |
+|---|---|
+| `predictions.jsonl` | jawaban, status abstain, dan sitasi ber-offset |
+| `manifest.json` | model, revisi, seed, prompt, `index_version`, token, latensi |
+| `requests.jsonl` | trace per permintaan |
+
+Runner memakai dua tahap: retrieval dulu, embedder dilepas, lalu generator
+dimuat. `bge-m3` dan Qwen 1.5B tidak muat bersamaan di 6 GB. Warmup tidak
+dihitung sebagai latensi. Hasil prediksi bisa langsung dinilai:
+
+```bash
+pokerag-eval generation \
+  --qrels data/benchmark/qrels/test.jsonl \
+  --predictions artifacts/runs/B2-r00/predictions.jsonl
+```
+
+Model dipin ke `Qwen/Qwen2.5-1.5B-Instruct` revisi
+`989aa7980e4cf806f80c7fef2b1adb7bc71aa306`. Rinciannya di ADR-0016.
+
 ## API
 
 UI memakai proxy Vite (`/api` → `127.0.0.1:8000`), jadi cukup jalankan dua
