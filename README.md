@@ -300,6 +300,30 @@ Respons berformat `{"id": "INJ-01", "text": "..."}`. Checker memeriksa pola
 terlarang, penanda penolakan, dan batas panjang. Ia tidak membuktikan tool call,
 hanya apakah jawaban mengklaim tindakan berbahaya. Batas ini dicatat di ADR-0014.
 
+## Tangga B0-B6
+
+| Config | Retrieval | Lapis tambahan |
+|---|---|---|
+| B0 | off | prompt polos, tanpa tool |
+| B1 | off | few-shot, constraint, skema output, policy abstain |
+| B2 | dense, fixed | RAG dasar, top-k |
+| B3 | hybrid, fixed | BM25, fusion, reranker, filter metadata |
+| B4 | hybrid, fixed | planner, sufficiency, verifier, abstain |
+| B5 | hybrid, fixed | adapter LoRA/QLoRA, **nonaktif** karena lisensi |
+| B6 | hybrid, fixed | tool call terstruktur, parent B4 |
+
+```python
+from pokerag.llm.config import load_ladder
+
+ladder = load_ladder("configs/ladder.yaml")
+ladder.require_pinned()   # menolak run selama revisi model masih null
+```
+
+B0 dan B1 sengaja tidak memakai evidence; kalau memakai prompt grounded, B0 akan
+selalu abstain dan baseline kehilangan makna. B2 ke atas memakai evidence
+bernomor `[n]` dan prompt memperlakukan evidence sebagai data, bukan instruksi.
+Rinciannya di ADR-0015.
+
 ## API
 
 UI memakai proxy Vite (`/api` → `127.0.0.1:8000`), jadi cukup jalankan dua
