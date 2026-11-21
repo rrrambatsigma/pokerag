@@ -207,6 +207,33 @@ manifest, jumlah titik Qdrant = jumlah baris parquet, dan urutan
 nomor baris, jadi urutan yang bergeser akan menghasilkan sitasi salah tanpa
 error). Melanggar salah satunya = error, bukan ranking yang terdengar masuk akal.
 
+## Benchmark test (qrels anotator)
+
+100 query test disusun terpisah di repo anotator, beserta ekspor tiga
+anotator. Adapter menggabungkan ekspor itu menjadi gold qrels ber-offset
+karakter:
+
+```bash
+pokerag-eval build \
+  --export A1=exports/a1.jsonl \
+  --export A2=exports/a2.jsonl \
+  --export A3=exports/a3.jsonl \
+  --queries queries.csv \
+  --policy union \
+  --out data/benchmark/qrels/test.jsonl
+
+pokerag-eval score --strategy heading --modes dense,bm25,hybrid --k 5,10
+```
+
+Kebijakan penggabungan: `single` (satu anotator, default selama belum ada
+adjudication), `union` (semua span yang ditandai siapa pun), dan `intersection`
+(hanya irisan). Query multi-hop menyumbang lebih dari satu dokumen gold;
+`doc_recall` dihitung sebagai fraksi seluruh dokumen gold. `span_hit` menuntut
+chunk beririsan dengan rentang karakter gold, bukan sekadar dokumen yang sama.
+
+Qrels test tidak di-commit selama benchmark belum dirilis: `data/benchmark/qrels/test*.jsonl`
+masuk `.gitignore`.
+
 ## UI demo — chat, sitasi, setelan
 
 `frontend/` berisi antarmuka React (Vite + TypeScript) bergaya panel GBA/Pokédex.
