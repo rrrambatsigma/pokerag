@@ -1,0 +1,67 @@
+# PokéRAG corpus snapshot v1
+# Selection is deterministic: National Pokédex 1..320 (Gen I-III species pages).
+# 320 are fetched so that >= 300 survive deduplication and quality gates.
+
+name: pokerag-corpus-v1
+source_site: bulbapedia
+artifacts_root: artifacts
+
+selection:
+  method: national_dex_range
+  list_page: "List of Pokémon by National Pokédex number"
+  from_dex: 1
+  to_dex: 320
+  namespace: 0
+
+fetch:
+  api: https://bulbapedia.bulbagarden.net/w/api.php
+  impersonate: chrome
+  user_agent: "PokeRAG-academic/0.1 (riset akademik; kontak: set-from-env)"
+  delay_seconds: 5.0          # robots.txt of bulbapedia.bulbagarden.net: Crawl-delay: 5
+  batch_titles: 5
+  timeout_seconds: 30
+  max_retries: 3
+  backoff_seconds: [10, 30, 60]
+
+license:
+  name: CC-BY-NC-SA-2.5
+  url: http://creativecommons.org/licenses/by-nc-sa/2.5/
+  allow_retrieval: true
+  allow_redistribute: false
+  allow_ft_training: false
+  attribution_template: "Bulbapedia, CC BY-NC-SA 2.5, revision {revid}"
+
+cleaning:
+  min_chars: 800
+  min_sections: 3
+  drop_selectors:
+    - ".mw-editsection"
+    - "sup.reference"
+    - "ol.references"
+    - ".toc"
+    - "figure"
+    - "style"
+    - "script"
+    - ".navbox"
+    - ".infobox"          # wrapper tabel; isi infobox tetap disimpan sebagai baris teks
+    - ".noprint"
+    - ".mw-empty-elt"
+    - ".hatnote"
+    - ".dablink"
+    - ".rellink"
+    - ".thumb"
+    - ".gallery"
+    - ".ambox"
+  drop_section_titles:
+    - "Contents"
+    - "Navigation"
+
+dedup:
+  shingle_size: 5
+  num_perm: 128
+  threshold: 0.85
+
+validation:
+  min_docs: 300
+  min_chars: 800
+  min_sections: 3

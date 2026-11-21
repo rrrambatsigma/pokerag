@@ -1,0 +1,31 @@
+# Index v1 — Gemini embeddings + Qdrant + BM25 (arsip; kuota free tier habis).
+#
+# Embedder dipin untuk SETIAP konfigurasi (B2–B6 dan A2), karena mengganti model
+# di tengah eksperimen mencampur efek retrieval dengan efek embedding. Vektor
+# dinormalisasi dan disimpan dengan cosine; BM25 tetap lokal sehingga B3
+# menggabungkan dua ranking yang benar-benar berbeda.
+
+snapshot: pokerag-corpus-v1
+strategies: [heading]
+artifacts_root: artifacts
+
+embedder:
+  provider: gemini
+  model: gemini-embedding-001
+  dimension: 768
+  task_document: RETRIEVAL_DOCUMENT
+  task_query: RETRIEVAL_QUERY
+  batch_size: 100
+  items_per_minute: 90        # free tier: 100 item/menit; sisakan margin
+  max_retries: 5
+  timeout_seconds: 120
+
+qdrant:
+  mode: local
+  path: indexes/qdrant
+  distance: cosine
+  on_disk: true
+
+bm25:
+  k1: 1.2
+  b: 0.75

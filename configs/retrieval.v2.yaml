@@ -1,0 +1,19 @@
+# Retrieval v2 — same fusion settings as v1, over the Gen I-III index.
+#
+# Parameters (RRF k and weights) are kept from the v1 dev baseline so that a
+# change in the B1 numbers can only come from the corpus, not from retuning.
+
+index: configs/index.gpu.v2.yaml
+strategy: heading
+
+top_dense: 20
+top_bm25: 20
+top_k: 5
+rrf_k: 10
+
+weights:
+  dense: 2.0
+  bm25: 1.0
+
+modes: [dense, bm25, hybrid]
+ks: [5, 10]

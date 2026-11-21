@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pokerag"
+version = "0.1.0"
+description = "PokéRAG: evidence-grounded Pokémon knowledge assistant (ingestion, chunking, index)"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+  "curl_cffi>=0.7",
+  "mwparserfromhell>=0.6",
+  "beautifulsoup4>=4.12",
+  "lxml>=5.0",
+  "pandas>=2.2",
+  "pyarrow>=15.0",
+  "numpy>=1.26",
+  "datasketch>=1.6",
+  "tqdm>=4.66",
+  "qdrant-client>=1.9",
+  "bm25s>=0.2",
+  "huggingface_hub>=0.23",
+  "transformers>=4.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+gpu = ["torch>=2.2", "sentence-transformers>=3.0"]
+
+[project.scripts]
+pokerag-ingest = "pokerag.ingest.cli:main"
+pokerag-chunk = "pokerag.chunking.cli:main"
+pokerag-index = "pokerag.index.cli:main"
+pokerag-retrieve = "pokerag.retrieval.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

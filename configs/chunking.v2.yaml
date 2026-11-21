@@ -1,0 +1,26 @@
+# Chunking v2 — same three strategies as v1, over the Gen I-III corpus.
+#
+# Parameters are deliberately identical to v1: the only changed variable is the
+# corpus (320 -> 386 documents), so A1 keeps comparing chunking methods rather
+# than a mix of corpus size and chunk settings.
+
+snapshot: pokerag-corpus-v2
+artifacts_root: artifacts
+tokenizer: hf:BAAI/bge-m3
+budget_tokens: 1024
+
+fixed:
+  window_chars: 2048
+  overlap_chars: 256
+
+heading:
+  max_chars: 1200
+  overlap_chars: 120
+  min_chars: 240
+
+hierarchical:
+  parent_chars: 1500
+  parent_overlap_chars: 0
+  child_chars: 1000
+  child_overlap_chars: 100
+  min_chars: 200

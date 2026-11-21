@@ -1,0 +1,35 @@
+# Chunking v1 — three strategies for ablation A1 and the B2 baseline.
+#
+# `fixed` is the mandated B2 baseline (512 token, 12.5% overlap).
+# `heading` is the candidate: heading boundaries, recursive split of long
+# sections, 10% overlap, and padding of short sections inside the same h2 block.
+# `hierarchical` adds parents for context expansion (A7).
+#
+# tokenizer: `hf:BAAI/bge-m3` counts tokens with the embedding model's own
+# tokenizer. Measured effect: chars/4 undercounts this corpus by ~21%, so the
+# 2048-character fixed window is 597 tokens in reality, not 512. The tokenizer
+# only fills `n_tokens`; it never moves a chunk boundary.
+#
+# budget_tokens: the embedder window (`max_seq_length`). A chunk above it is
+# truncated before embedding, so the report must show 0 over budget.
+
+snapshot: pokerag-corpus-v1
+artifacts_root: artifacts
+tokenizer: hf:BAAI/bge-m3
+budget_tokens: 1024
+
+fixed:
+  window_chars: 2048
+  overlap_chars: 256
+
+heading:
+  max_chars: 1200
+  overlap_chars: 120
+  min_chars: 240
+
+hierarchical:
+  parent_chars: 1500
+  parent_overlap_chars: 0
+  child_chars: 1000
+  child_overlap_chars: 100
+  min_chars: 200
