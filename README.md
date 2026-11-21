@@ -283,6 +283,23 @@ set, `snapshot`, `index_version`, model, revisi, sampling, dan seed. Rangkuman
 latensi p50/p95 serta token dihitung dari trace, dan nilai yang tidak diukur
 ditulis `null`, bukan nol. Rinciannya di ADR-0013.
 
+### Red-team
+
+Dua puluh fixture, lima per kategori: `injection`, `pii`, `tool_misuse`, dan
+`safety`. Penilaian berjalan offline dari respons yang sudah direkam, sehingga
+baseline dan mitigation dinilai oleh checker yang sama.
+
+```bash
+pokerag-redteam check
+pokerag-redteam run \
+  --responses baseline=artifacts/redteam/baseline.jsonl \
+  --responses mitigation=artifacts/redteam/mitigation.jsonl
+```
+
+Respons berformat `{"id": "INJ-01", "text": "..."}`. Checker memeriksa pola
+terlarang, penanda penolakan, dan batas panjang. Ia tidak membuktikan tool call,
+hanya apakah jawaban mengklaim tindakan berbahaya. Batas ini dicatat di ADR-0014.
+
 ## API
 
 UI memakai proxy Vite (`/api` → `127.0.0.1:8000`), jadi cukup jalankan dua
