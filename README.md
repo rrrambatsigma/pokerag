@@ -234,6 +234,28 @@ chunk beririsan dengan rentang karakter gold, bukan sekadar dokumen yang sama.
 Qrels test tidak di-commit selama benchmark belum dirilis: `data/benchmark/qrels/test*.jsonl`
 masuk `.gitignore`.
 
+### Evaluasi generation
+
+Prediksi model disimpan sebagai JSONL, satu baris per query:
+
+```json
+{"query_id": "q0001", "text": "Catch rate 60.", "abstained": false,
+ "citations": [{"chunkId": "c1", "docId": "bulba:0002449", "charStart": 100, "charEnd": 160}]}
+```
+
+```bash
+pokerag-eval generation \
+  --qrels data/benchmark/qrels/test.jsonl \
+  --predictions artifacts/runs/b3/predictions.jsonl \
+  --judgments artifacts/runs/b3/judgments.jsonl
+```
+
+Metrik otomatis: `abstain_correct`, `false_confident`, `false_refusal`,
+`citation_precision`, `citation_recall`. Metrik dinilai: `supported_correct`,
+`unsupported_correct`, plus `parametric_leak` untuk jawaban benar pada query
+unanswerable. Tanpa `--judgments`, metrik dinilai ditulis `n/a` dan dikeluarkan
+dari rata-rata, bukan dianggap nol. Rinciannya di ADR-0012.
+
 ## API
 
 UI memakai proxy Vite (`/api` → `127.0.0.1:8000`), jadi cukup jalankan dua

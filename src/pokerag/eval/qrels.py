@@ -32,6 +32,7 @@ class QueryMeta:
     query_id: str
     text: str
     slice: str = ""
+    note: str = ""
 
 
 @dataclass(frozen=True)
@@ -67,12 +68,14 @@ class GoldQuery:
     answerable: bool
     gold: tuple[GoldDoc, ...]
     annotators: tuple[str, ...]
+    note: str = ""
 
     def to_dict(self) -> dict:
         return {
             "query_id": self.query_id,
             "query": self.query,
             "slice": self.slice,
+            "note": self.note,
             "answerable": self.answerable,
             "annotators": list(self.annotators),
             "gold": [
@@ -180,6 +183,7 @@ def load_queries(path: Path) -> dict[str, QueryMeta]:
             query_id=query_id,
             text=text,
             slice=str(raw.get("slice") or ""),
+            note=str(raw.get("note") or ""),
         )
     if not queries:
         raise ValueError(f"{path}: query set kosong")
@@ -306,6 +310,7 @@ def build_gold(
                     answerable=False,
                     gold=(),
                     annotators=tuple(names),
+                    note=meta.note,
                 )
             )
             continue
@@ -351,6 +356,7 @@ def build_gold(
                 answerable=answerable,
                 gold=tuple(gold_docs),
                 annotators=tuple(names),
+                note=meta.note,
             )
         )
 
@@ -369,6 +375,7 @@ def load_gold(path: Path) -> list[GoldQuery]:
                 query_id=str(raw["query_id"]),
                 query=str(raw["query"]),
                 slice=str(raw.get("slice") or ""),
+                note=str(raw.get("note") or ""),
                 answerable=bool(raw.get("answerable")),
                 annotators=tuple(raw.get("annotators") or ()),
                 gold=tuple(

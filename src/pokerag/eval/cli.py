@@ -14,7 +14,14 @@ import json
 import sys
 from pathlib import Path
 
-from pokerag.core.jsonl import atomic_write_text, write_json
+from pokerag.core.jsonl import atomic_write_text, read_jsonl, write_json
+from pokerag.eval.generation import (
+    Judgment,
+    Prediction,
+    PredictionCitation,
+    evaluate_generation,
+    render_markdown as render_generation_markdown,
+)
 from pokerag.eval.metrics import evaluate_gold, render_markdown
 from pokerag.eval.qrels import (
     POLICIES,
@@ -41,6 +48,60 @@ def _list(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes"}
+
+
+def load_predictions(path: Path) -> list[Prediction]:
+    """Read model predictions from JSONL (camelCase or snake_case)."""
+    predictions: list[Prediction] = []
+    for raw in read_jsonl(path):
+        query_id = str(raw.get("query_id") or "")
+        if not query_id:
+            raise ValueError(f"{path}: baris tanpa query_id")
+        citations = tuple(
+            PredictionCitation(
+                chunk_id=str(item.get("chunkId") or item.get("chunk_id") or ""),
+                doc_id=str(item.get("docId") or item.get("doc_id") or ""),
+                char_start=int(item.get("charStart") or item.get("char_start") or 0),
+                char_end=int(item.get("charEnd") or item.get("char_end") or 0),
+            )
+            for item in raw.get("citations", [])
+        )
+        predictions.append(
+            Prediction(
+                query_id=query_id,
+                text=str(raw.get("text") or ""),
+                abstained=bool(raw.get("abstained", False)),
+                citations=citations,
+            )
+        )
+    if not predictions:
+        raise ValueError(f"{path}: predictions kosong")
+    return predictions
+
+
+def load_judgments(path: Path) -> list[Judgment]:
+    """Read optional correctness labels: {query_id, correct, supported}."""
+    judgments: list[Judgment] = []
+    for raw in read_jsonl(path):
+        query_id = str(raw.get("query_id") or "")
+        if not query_id:
+            raise ValueError(f"{path}: baris tanpa query_id")
+        judgments.append(
+            Judgment(
+                query_id=query_id,
+                correct=_optional_bool(raw.get("correct")),
+                supported=_optional_bool(raw.get("supported")),
+            )
+        )
+    return judgments
 
 
 def _export(value: str) -> tuple[str, Path]:
@@ -121,6 +182,36 @@ def cmd_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generation(args: argparse.Namespace) -> int:
+    golds = load_gold(Path(args.qrels))
+    predictions = load_predictions(Path(args.predictions))
+    judgments = (
+        load_judgments(Path(args.judgments)) if args.judgments else []
+    )
+    result = evaluate_generation(golds, predictions, judgments)
+
+    meta = {
+        "qrels": str(args.qrels),
+        "predictions": str(args.predictions),
+        "judgments": str(args.judgments or ""),
+    }
+    write_json(Path(args.output), {"meta": meta, **result})
+    if not args.no_docs:
+        atomic_write_text(Path(args.docs), render_generation_markdown(result, meta))
+
+    print(
+        f"queries={result['queries']} predictions={result['predictions']} "
+        f"missing={result['missing']} judged={result['judged']}"
+    )
+    for metric, value in result["metrics"].items():
+        rendered = "n/a" if value is None else f"{value:.3f}"
+        print(f"  {metric:22s} {rendered}")
+    print(f"json: {args.output}")
+    if not args.no_docs:
+        print(f"tabel: {args.docs}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pokerag-eval", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -151,12 +242,24 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--docs", default="docs/experiments/test-retrieval.md")
     score.add_argument("--no-docs", action="store_true", help="jangan tulis tabel markdown")
 
+    generation = sub.add_parser(
+        "generation", help="abstention, citation and judged-answer metrics"
+    )
+    generation.add_argument("--qrels", default="data/benchmark/qrels/test.jsonl")
+    generation.add_argument("--predictions", required=True, help="JSONL prediksi model")
+    generation.add_argument("--judgments", default=None, help="JSONL {query_id, correct, supported}")
+    generation.add_argument("--output", default="artifacts/reports/generation.json")
+    generation.add_argument("--docs", default="docs/experiments/generation.md")
+    generation.add_argument("--no-docs", action="store_true")
+
     args = parser.parse_args(argv)
     _utf8_stdout()
     if args.command == "build":
         return cmd_build(args)
     if args.command == "score":
         return cmd_score(args)
+    if args.command == "generation":
+        return cmd_generation(args)
     return 0
 
 
