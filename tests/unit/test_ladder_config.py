@@ -44,11 +44,20 @@ def test_ladder_encodes_the_intended_layers() -> None:
     assert configs["B6"].tools == ["document_version", "generation_check"]
 
 
-def test_revision_must_be_pinned_before_a_run() -> None:
+def test_revision_is_pinned_for_runs() -> None:
     ladder = load_ladder(LADDER)
 
-    with pytest.raises(ValueError):
-        ladder.require_pinned()
+    assert ladder.base_model.revision == "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+    ladder.require_pinned()
+
+
+def test_unpinned_revision_is_rejected(tmp_path: Path) -> None:
+    path = _copy_ladder(
+        tmp_path, lambda data: data["base_model"].update({"revision": None})
+    )
+
+    with pytest.raises(ValueError, match="revision"):
+        load_ladder(path).require_pinned()
 
 
 def _copy_ladder(tmp_path: Path, mutate) -> Path:
