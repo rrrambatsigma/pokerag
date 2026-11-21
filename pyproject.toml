@@ -23,10 +23,12 @@ dependencies = [
   "bm25s>=0.2",
   "huggingface_hub>=0.23",
   "transformers>=4.40",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
 gpu = ["torch>=2.2", "sentence-transformers>=3.0"]
 
 [project.scripts]
@@ -35,6 +37,7 @@ pokerag-chunk = "pokerag.chunking.cli:main"
 pokerag-index = "pokerag.index.cli:main"
 pokerag-retrieve = "pokerag.retrieval.cli:main"
 pokerag-eval = "pokerag.eval.cli:main"
+pokerag-api = "pokerag.api.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

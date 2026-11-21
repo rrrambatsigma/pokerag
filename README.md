@@ -234,6 +234,27 @@ chunk beririsan dengan rentang karakter gold, bukan sekadar dokumen yang sama.
 Qrels test tidak di-commit selama benchmark belum dirilis: `data/benchmark/qrels/test*.jsonl`
 masuk `.gitignore`.
 
+## API
+
+UI memakai proxy Vite (`/api` → `127.0.0.1:8000`), jadi cukup jalankan dua
+proses:
+
+```bash
+pokerag-api --port 8000
+cd frontend && npm run dev
+```
+
+| Endpoint | Isi |
+|---|---|
+| `GET /api/health` | snapshot, `index_version`, strategi, generator, mode |
+| `GET /api/search?q=&mode=&strategy=&k=` | sitasi hasil retrieval |
+| `POST /api/chat` | `{message, settings}` → satu pesan asisten dengan sitasi |
+
+Settings UI dipetakan ke mode: dense+bm25 = `hybrid`, salah satu = `dense` atau
+`bm25`, keduanya mati = `off` (tanpa retrieval, posisi B0). Selama generator
+Qwen belum ada, `StubGenerator` mengembalikan jawaban deterministik dengan
+sitasi dari hasil retrieval. Kontraknya sama dengan generator asli.
+
 ## UI demo — chat, sitasi, setelan
 
 `frontend/` berisi antarmuka React (Vite + TypeScript) bergaya panel GBA/Pokédex.
