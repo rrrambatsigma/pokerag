@@ -41,6 +41,21 @@ uji idempotensi fetch/clean/freeze, uji index: tiga koleksi dalam satu
 database, cache terikat identitas embedder, gate pemotongan chunk, serta uji
 retrieval: RRF, guard index basi, isolasi mode, dan metrik evaluasi).
 
+## Bootstrap dari artefak beku
+
+Kalau hanya perlu index yang sudah jadi, misalnya di mesin baru, CI, atau image
+API, unduh artefak alih-alih menjalankan seluruh pipeline:
+
+```bash
+python scripts/fetch_artifacts.py --extract
+```
+
+Skrip mengambil 28 file dari `meivawijaya/pokerag-corpus-v3` (Qdrant, BM25,
+chunk, manifest), memverifikasi setiap file terhadap `INTEGRITY.sha256`, lalu
+mengekstrak `indexes/` ke `artifacts/`. Ukuran sekitar 330 MB dan tidak butuh
+GPU. Build tetap sumber kebenaran; ini hanya jalur cepat untuk mengonsumsi hasil
+yang sudah dibekukan.
+
 ## Idempotensi
 
 Semua stage aman dijalankan berulang:
