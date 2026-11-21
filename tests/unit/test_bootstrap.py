@@ -8,8 +8,10 @@ from pathlib import Path
 from pokerag.bootstrap import (
     IntegrityEntry,
     extract_indexes,
+    organize,
     parse_integrity,
     select_paths,
+    target_relative,
 )
 from pokerag.core.hashing import sha256_file
 
@@ -80,3 +82,34 @@ def test_extract_indexes_and_skip_second_time(tmp_path: Path) -> None:
     assert extract_indexes(archive, dest) is True
     assert (dest / "indexes" / "qdrant" / "meta.json").is_file()
     assert extract_indexes(archive, dest) is False
+
+
+def test_target_relative_layout() -> None:
+    assert target_relative("chunks/fixed.parquet", "snap") == Path(
+        "corpus/snap/chunks/fixed.parquet"
+    )
+    assert target_relative("documents.parquet", "snap") == Path("corpus/snap/documents.parquet")
+    assert target_relative("manifests/snapshot.json", "snap") == Path(
+        "corpus/snap/manifests/snapshot.json"
+    )
+    assert target_relative("indexes.tar.gz", "snap") is None
+
+
+def test_organize_moves_verified_files(tmp_path: Path) -> None:
+    staging = tmp_path / "raw"
+    (staging / "chunks").mkdir(parents=True)
+    (staging / "chunks" / "fixed.parquet").write_bytes(b"x")
+    (staging / "documents.parquet").write_bytes(b"y")
+
+    dest = tmp_path / "artifacts"
+    moved = organize(
+        staging,
+        dest,
+        "snap",
+        ["chunks/fixed.parquet", "documents.parquet", "indexes.tar.gz"],
+    )
+
+    assert (dest / "corpus" / "snap" / "chunks" / "fixed.parquet").is_file()
+    assert (dest / "corpus" / "snap" / "documents.parquet").is_file()
+    assert not (staging / "chunks" / "fixed.parquet").exists()
+    assert len(moved) == 2

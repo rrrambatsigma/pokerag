@@ -32,6 +32,14 @@ DEFAULT_EXTRA = ("indexes.tar.gz", "documents.parquet")
 
 INDEX_MARKER = Path("indexes") / "qdrant" / "meta.json"
 
+SNAPSHOT_FILES = {"documents.parquet", "register.parquet", "cleaned.jsonl"}
+PREFIX_LAYOUT = {
+    "chunks/": "corpus/{snapshot}/chunks",
+    "manifests/": "corpus/{snapshot}/manifests",
+    "embeddings/": "embeddings",
+    "reports/": "reports",
+}
+
 
 @dataclass(frozen=True)
 class IntegrityEntry:
@@ -73,6 +81,42 @@ def select_paths(
         if path.startswith(prefixes):
             selected.add(path)
     return sorted(selected)
+
+
+def target_relative(path: str, snapshot: str) -> Path | None:
+    """Map a dataset path to the layout the pipeline reads.
+
+    ``chunks/`` and the corpus parquet live under
+    ``artifacts/corpus/<snapshot>/``; indexes are extracted separately. Files
+    with no mapping stay in ``artifacts/raw`` for provenance.
+    """
+    for prefix, template in PREFIX_LAYOUT.items():
+        if path.startswith(prefix):
+            return Path(template.format(snapshot=snapshot)) / path[len(prefix) :]
+    if path in SNAPSHOT_FILES:
+        return Path("corpus") / snapshot / path
+    return None
+
+
+def organize(
+    staging: Path, dest: Path, snapshot: str, paths: Iterable[str]
+) -> list[Path]:
+    """Move verified files from staging into the pipeline layout."""
+    moved: list[Path] = []
+    for path in paths:
+        relative = target_relative(path, snapshot)
+        if relative is None:
+            continue
+        source = staging / path
+        if not source.is_file():
+            continue
+        target = dest / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            target.unlink()
+        shutil.move(str(source), target)
+        moved.append(target)
+    return moved
 
 
 def download_file(
@@ -141,6 +185,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--extract", action="store_true", help="extract indexes.tar.gz after verifying"
     )
+    parser.add_argument(
+        "--snapshot",
+        default="pokerag-corpus-v2",
+        help="snapshot directory under artifacts/corpus",
+    )
+    parser.add_argument(
+        "--no-organize",
+        action="store_true",
+        help="keep downloads in artifacts/raw instead of the pipeline layout",
+    )
     parser.add_argument("--force", action="store_true", help="redownload and re-extract")
     return parser
 
@@ -175,6 +229,10 @@ def main(argv: list[str] | None = None) -> int:
             force=args.force,
         )
         LOGGER.info("ok %s", path)
+
+    if not args.no_organize:
+        moved = organize(raw, dest, args.snapshot, paths)
+        LOGGER.info("%d file ditempatkan di layout pipeline", len(moved))
 
     if args.extract:
         archive = raw / "indexes.tar.gz"

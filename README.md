@@ -52,9 +52,10 @@ python scripts/fetch_artifacts.py --extract
 
 Skrip mengambil 28 file dari `meivawijaya/pokerag-corpus-v3` (Qdrant, BM25,
 chunk, manifest), memverifikasi setiap file terhadap `INTEGRITY.sha256`, lalu
-mengekstrak `indexes/` ke `artifacts/`. Ukuran sekitar 330 MB dan tidak butuh
-GPU. Build tetap sumber kebenaran; ini hanya jalur cepat untuk mengonsumsi hasil
-yang sudah dibekukan.
+menempatkannya sesuai layout pipeline: chunk dan parquet korpus ke
+`artifacts/corpus/pokerag-corpus-v2/`, index diekstrak ke `artifacts/indexes/`.
+Ukuran sekitar 330 MB dan tidak butuh GPU. Build tetap sumber kebenaran; ini
+hanya jalur cepat untuk mengonsumsi hasil yang sudah dibekukan.
 
 ## Idempotensi
 
