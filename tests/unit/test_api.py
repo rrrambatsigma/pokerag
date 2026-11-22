@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from pokerag.api.app import create_app
+from pokerag.llm.base import Answer
 from pokerag.retrieval.document_meta import DocMeta
 from pokerag.retrieval.types import Hit
 
@@ -149,3 +150,23 @@ def test_chat_validates_top_k() -> None:
         )
 
     assert response.status_code == 422
+
+
+class SilentGenerator:
+    name = "silent"
+
+    def generate(self, question, evidence):
+        return Answer(text="Catch rate 60.", cited_chunk_ids=(), abstained=False)
+
+
+def test_chat_falls_back_to_top_source_when_model_omits_citations() -> None:
+    app = create_app(
+        retrievers={"heading": FakeRetriever([hit()])},
+        doc_meta=META,
+        generator=SilentGenerator(),
+    )
+    with TestClient(app) as http:
+        response = http.post("/api/chat", json={"message": "catch rate?"})
+
+    message = response.json()["message"]
+    assert message["citations"][0]["chunkId"] == "c1"

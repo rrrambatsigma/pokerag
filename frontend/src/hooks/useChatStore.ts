@@ -1,25 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Message, Settings, UiState } from '../types';
+import { useCallback, useEffect, useState } from 'react';
+import type { Citation, Message, Settings, UiState } from '../types';
 import { modeFromSettings } from '../lib/mode';
 import { emptyConversation, newId, titleFromText } from '../lib/conversations';
 import { loadState, saveState } from '../lib/storage';
 import { answerFor } from '../mock/data';
+import { askApi } from '../api/client';
 
 export function useChatStore() {
   const [state, setState] = useState<UiState>(() => loadState());
-  const timers = useRef<Set<number>>(new Set());
-
   useEffect(() => {
     saveState(state);
   }, [state]);
-
-  useEffect(() => {
-    const pending = timers.current;
-    return () => {
-      pending.forEach((timer) => window.clearTimeout(timer));
-      pending.clear();
-    };
-  }, []);
 
   const newChat = useCallback(() => {
     const conversation = emptyConversation();
@@ -58,7 +49,7 @@ export function useChatStore() {
   }, []);
 
   const send = useCallback(
-    (text: string, settings: Settings) => {
+    async (text: string, settings: Settings) => {
       const trimmed = text.trim();
       if (!trimmed || modeFromSettings(settings) === 'off') return;
 
@@ -99,8 +90,7 @@ export function useChatStore() {
         ),
       }));
 
-      const timer = window.setTimeout(() => {
-        const answer = answerFor(trimmed);
+      const replaceAssistant = (answer: { text: string; citations: Citation[] }) => {
         setState((prev) => ({
           ...prev,
           conversations: prev.conversations.map((conversation) =>
@@ -122,9 +112,14 @@ export function useChatStore() {
                 },
           ),
         }));
-        timers.current.delete(timer);
-      }, 900);
-      timers.current.add(timer);
+      };
+
+      try {
+        replaceAssistant(await askApi(trimmed, settings));
+      } catch (error) {
+        console.warn('PokeRAG API tidak tersedia, memakai mock.', error);
+        replaceAssistant(answerFor(trimmed));
+      }
     },
     [state.activeId],
   );

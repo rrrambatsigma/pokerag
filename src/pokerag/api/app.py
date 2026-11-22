@@ -27,10 +27,12 @@ from pokerag.api.models import (
     mode_for,
 )
 from pokerag.llm.base import Generator
+from pokerag.llm.planner import plan_subqueries
 from pokerag.llm.stub import StubGenerator
 from pokerag.retrieval.config import load_retrieval_config
 from pokerag.retrieval.document_meta import DocMeta, load_doc_meta
 from pokerag.retrieval.pipeline import Retriever
+from pokerag.retrieval.rerank import Reranker
 from pokerag.retrieval.types import Hit
 
 DEFAULT_CONFIG = "configs/retrieval.v2.yaml"
@@ -103,8 +105,14 @@ def _citation(n: int, hit: Hit, meta: Mapping[str, DocMeta]) -> Citation:
 
 
 def _citations(
-    hits: Sequence[Hit], cited: Sequence[str], meta: Mapping[str, DocMeta]
+    hits: Sequence[Hit],
+    cited: Sequence[str],
+    meta: Mapping[str, DocMeta],
+    *,
+    fallback: bool = False,
 ) -> list[Citation]:
+    if not cited and fallback and hits:
+        cited = (hits[0].chunk_id,)
     by_id = {hit.chunk_id: hit for hit in hits}
     citations: list[Citation] = []
     for chunk_id in cited:
@@ -126,6 +134,9 @@ def create_app(
     retrievers: Mapping[str, RetrieverLike] | None = None,
     doc_meta: Mapping[str, DocMeta] | None = None,
     generator: Generator | None = None,
+    reranker: Reranker | None = None,
+    planner: bool = False,
+    variant_name: str | None = None,
 ) -> FastAPI:
     cfg = load_retrieval_config(Path(config_path))
     pool: RetrieverPool | MappingPool
@@ -144,6 +155,9 @@ def create_app(
     app.state.cfg = cfg
     app.state.pool = pool
     app.state.generator = gen
+    app.state.reranker = reranker
+    app.state.planner = planner
+    app.state.variant = variant_name or "stub"
     app.state.doc_meta = meta
 
     def document_meta() -> Mapping[str, DocMeta]:
@@ -161,6 +175,7 @@ def create_app(
             strategy=retriever.strategy,
             collection=retriever.collection,
             generator=gen.name,
+            variant=app.state.variant,
             modes=list(MODES),
         )
 
@@ -192,15 +207,35 @@ def create_app(
         retriever = pool.get(request.settings.strategy)
         hits: list[Hit] = []
         if mode != "off":
-            hits = retriever.search(
-                request.message, mode=mode, top_k=request.settings.topK
+            subqueries = (
+                plan_subqueries(request.message) if planner else [request.message]
+            )
+            candidate_k = (
+                max(request.settings.topK, 20) if reranker is not None else request.settings.topK
+            )
+            candidates: list[Hit] = []
+            seen: set[str] = set()
+            for subquery in subqueries:
+                for hit in retriever.search(subquery, mode=mode, top_k=candidate_k):
+                    if hit.chunk_id not in seen:
+                        seen.add(hit.chunk_id)
+                        candidates.append(hit)
+            hits = (
+                reranker.rerank(request.message, candidates, request.settings.topK)
+                if reranker is not None
+                else candidates[: request.settings.topK]
             )
 
         answer = gen.generate(request.message, hits)
         citations = (
             []
             if answer.abstained
-            else _citations(hits, answer.cited_chunk_ids, document_meta())
+            else _citations(
+                hits,
+                answer.cited_chunk_ids,
+                document_meta(),
+                fallback=not answer.abstained,
+            )
         )
         message = ChatMessage(
             id=uuid.uuid4().hex,
