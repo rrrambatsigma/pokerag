@@ -28,6 +28,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="override reranker, dipakai untuk A2",
     )
+    parser.add_argument(
+        "--planner",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="override planner, dipakai untuk A3/A6",
+    )
+    parser.add_argument(
+        "--verifier",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="override verifier, dipakai untuk A3",
+    )
     parser.add_argument("--out-root", default="artifacts/runs")
     parser.add_argument("--retrieval-config", default="configs/retrieval.v2.yaml")
     args = parser.parse_args(argv)
@@ -41,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         device=args.device,
         mode=args.mode,
         rerank=args.rerank,
+        planner=args.planner,
+        verifier=args.verifier,
         out_root=args.out_root,
         retrieval_config=args.retrieval_config,
     )

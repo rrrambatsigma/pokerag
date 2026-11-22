@@ -124,6 +124,7 @@ class RequestRecord:
     abstained: bool = False
     cited_chunk_ids: tuple[str, ...] = ()
     error: str | None = None
+    repairs: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -134,6 +135,7 @@ class RequestRecord:
             "abstained": self.abstained,
             "cited_chunk_ids": list(self.cited_chunk_ids),
             "error": self.error,
+            "repairs": self.repairs,
         }
 
 
@@ -258,6 +260,7 @@ def summarise(records: list[RequestRecord]) -> dict[str, Any]:
         "requests": len(records),
         "errors": len(records) - len(ok),
         "abstained": sum(1 for record in records if record.abstained),
+        "repairs": sum(record.repairs for record in records),
         "abstain_rate": (
             sum(1 for record in records if record.abstained) / len(records)
             if records
