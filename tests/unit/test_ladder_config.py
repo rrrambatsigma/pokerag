@@ -34,6 +34,9 @@ def test_ladder_encodes_the_intended_layers() -> None:
 
     assert configs["B3"].retrieval.mode == "hybrid"
     assert configs["B3"].reranker and not configs["B3"].planner
+    assert ladder.reranker is not None
+    assert ladder.reranker.model_id == "BAAI/bge-reranker-v2-m3"
+    assert ladder.reranker.candidates == 20
 
     for name in ("B4", "B5", "B6"):
         variant = configs[name]
@@ -49,6 +52,16 @@ def test_revision_is_pinned_for_runs() -> None:
 
     assert ladder.base_model.revision == "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
     ladder.require_pinned()
+
+
+def test_reranker_revision_must_be_pinned(tmp_path: Path) -> None:
+    def mutate(data):
+        data["reranker"]["revision"] = None
+
+    path = _copy_ladder(tmp_path, mutate)
+
+    with pytest.raises(ValueError, match="reranker"):
+        load_ladder(path).require_pinned()
 
 
 def test_unpinned_revision_is_rejected(tmp_path: Path) -> None:

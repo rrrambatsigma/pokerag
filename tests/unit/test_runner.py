@@ -148,3 +148,123 @@ def test_unknown_variant_is_rejected(tmp_path: Path) -> None:
             out_root=tmp_path / "runs",
             generator=FakeGenerator(),
         )
+
+
+class FakeReranker:
+    name = "fake-rerank"
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, int, int]] = []
+
+    def rerank(self, query: str, hits, top_k: int):
+        self.calls.append((query, len(hits), top_k))
+        return list(reversed(hits))[:top_k]
+
+
+def hits_three() -> list[Hit]:
+    base = hit()
+    return [
+        base,
+        Hit(
+            chunk_id="c2",
+            score=0.8,
+            rank=2,
+            source="hybrid",
+            doc_id="bulba:0000092",
+            text="Minun is Electric.",
+            heading_path=["Biology"],
+            char_start=10,
+            char_end=20,
+            url="",
+        ),
+        Hit(
+            chunk_id="c3",
+            score=0.7,
+            rank=3,
+            source="hybrid",
+            doc_id="bulba:0000093",
+            text="Plusle is Electric.",
+            heading_path=["Biology"],
+            char_start=30,
+            char_end=40,
+            url="",
+        ),
+    ]
+
+
+class FakeRetrieverMany(FakeRetriever):
+    def search(self, query: str, mode: str = "hybrid", top_k: int = 5) -> list[Hit]:
+        self.calls.append((query, mode, top_k))
+        return hits_three()[:top_k]
+
+
+def test_b3_uses_candidates_and_reranks(tmp_path: Path) -> None:
+    retriever = FakeRetrieverMany()
+    reranker = FakeReranker()
+
+    run_dir = run_variant(
+        ladder_path=LADDER,
+        variant_name="B3",
+        queries_path=query_file(tmp_path),
+        limit=1,
+        out_root=tmp_path / "runs",
+        generator=FakeGenerator(),
+        retriever=retriever,
+        reranker=reranker,
+    )
+
+    predictions = [
+        json.loads(line)
+        for line in (run_dir / "predictions.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert retriever.calls[-1] == ("What type is Cloyster?", "hybrid", 20)
+    assert reranker.calls == [("What type is Cloyster?", 3, 5)]
+    assert predictions[0]["citations"][0]["chunkId"] == "c3"
+    assert manifest["extra"]["rerank"] is True
+    assert manifest["extra"]["reranker_model"] == "BAAI/bge-reranker-v2-m3"
+
+
+def test_no_rerank_override_skips_reranker(tmp_path: Path) -> None:
+    retriever = FakeRetrieverMany()
+    reranker = FakeReranker()
+
+    run_dir = run_variant(
+        ladder_path=LADDER,
+        variant_name="B3",
+        queries_path=query_file(tmp_path),
+        limit=1,
+        out_root=tmp_path / "runs",
+        generator=FakeGenerator(),
+        retriever=retriever,
+        reranker=reranker,
+        rerank=False,
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert retriever.calls[-1] == ("What type is Cloyster?", "hybrid", 5)
+    assert reranker.calls == []
+    assert manifest["extra"]["rerank"] is False
+
+
+def test_mode_override_changes_retrieval_and_manifest(tmp_path: Path) -> None:
+    retriever = FakeRetriever()
+
+    run_dir = run_variant(
+        ladder_path=LADDER,
+        variant_name="B2",
+        queries_path=query_file(tmp_path),
+        limit=1,
+        out_root=tmp_path / "runs",
+        generator=FakeGenerator(),
+        retriever=retriever,
+        mode="bm25",
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert retriever.calls[-1] == ("What type is Cloyster?", "bm25", 5)
+    assert manifest["mode"] == "bm25"
+    assert manifest["extra"]["mode_override"] == "bm25"

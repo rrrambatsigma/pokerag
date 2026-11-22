@@ -23,6 +23,14 @@ sampling:
   max_new_tokens: 512
   seeds: [7, 17, 27]
 
+# Reranker dipakai B3-B6. Kandidat diambil lebih dulu, lalu dipotong ke top_k.
+reranker:
+  model_id: BAAI/bge-reranker-v2-m3
+  revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+  dtype: float16
+  device: cuda
+  candidates: 20
+
 configs:
   B0:
     system_prompt: configs/prompts/b0_system.txt

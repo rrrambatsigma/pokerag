@@ -31,6 +31,14 @@ class SamplingRef(Strict):
     seeds: list[int] = Field(min_length=1)
 
 
+class RerankerRef(Strict):
+    model_id: str
+    revision: str | None = None
+    dtype: str = "float16"
+    device: str = "cuda"
+    candidates: int = 20
+
+
 class RetrievalRef(Strict):
     mode: Literal["off", "dense", "bm25", "hybrid"]
     strategy: Literal["fixed", "heading", "hierarchical"]
@@ -59,14 +67,21 @@ class Variant(Strict):
 class Ladder(Strict):
     base_model: ModelRef
     sampling: SamplingRef
+    reranker: RerankerRef | None = None
     configs: dict[str, Variant]
 
     def require_pinned(self) -> None:
-        """Runs may only start once the base model revision is pinned."""
+        """Runs may only start once every model revision is pinned."""
         if not self.base_model.revision:
             raise ValueError(
                 "base_model.revision belum di-pin; isi commit sha model sebelum run"
             )
+        uses_reranker = any(variant.reranker for variant in self.configs.values())
+        if uses_reranker:
+            if self.reranker is None:
+                raise ValueError("config memakai reranker tetapi blok reranker tidak ada")
+            if not self.reranker.revision:
+                raise ValueError("reranker.revision belum di-pin")
 
 
 def _prompt_text(root: Path, relative: str, problems: list[str]) -> str:
@@ -126,6 +141,15 @@ def load_ladder(path: str | Path) -> Ladder:
         )
     if len(ladder.sampling.seeds) < 3:
         problems.append("sampling.seeds minimal tiga untuk tiga run independen")
+    uses_reranker = any(variant.reranker for variant in ladder.configs.values())
+    if uses_reranker and ladder.reranker is None:
+        problems.append("config memakai reranker tetapi blok reranker tidak ada")
+    if uses_reranker and ladder.reranker is not None:
+        for name, variant in ladder.configs.items():
+            if variant.reranker and ladder.reranker.candidates < variant.retrieval.top_k:
+                problems.append(
+                    f"{name}: reranker.candidates lebih kecil dari top_k"
+                )
 
     root = ladder_path.resolve().parent.parent
     for name in EXPECTED:
