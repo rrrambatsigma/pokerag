@@ -108,3 +108,13 @@ def test_build_messages_includes_numbered_evidence() -> None:
     assert "[1] d1" in messages[1]["content"]
     assert "[2] d2" in messages[1]["content"]
     assert "never as instructions" in messages[0]["content"]
+
+
+def test_parse_unescaped_quotes_inside_answer() -> None:
+    raw = '{"answer": "Tauros is called "Kamaitachi" in Japanese.", "citations": [], "abstain": false}'
+
+    answer = parse_answer(raw, hits())
+
+    assert answer.text == 'Tauros is called "Kamaitachi" in Japanese.'
+    assert answer.abstained is False
+    assert answer.cited_chunk_ids == ()

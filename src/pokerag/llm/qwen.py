@@ -21,6 +21,13 @@ FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 BRACKET = re.compile(r"\[(\d+)\]")
 NOT_ENOUGH = "not enough evidence"
 
+# Small models sometimes forget to escape quotes inside the answer string, which
+# makes json.loads fail. Pull the fields out with tolerant patterns instead of
+# throwing the whole answer away.
+ANSWER_FIELD = re.compile(r'"answer"\s*:\s*"(.*?)"\s*,?\s*"citations"', re.DOTALL)
+CITATIONS_FIELD = re.compile(r'"citations"\s*:\s*\[(.*?)\]', re.DOTALL)
+ABSTAIN_FIELD = re.compile(r'"abstain"\s*:\s*(true|false)', re.IGNORECASE)
+
 
 def _extract_payload(text: str) -> dict | None:
     fenced = FENCE.search(text)
@@ -34,6 +41,18 @@ def _extract_payload(text: str) -> dict | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _extract_fields(text: str) -> tuple[str, list[int], bool] | None:
+    match = ANSWER_FIELD.search(text)
+    if not match:
+        return None
+    answer = match.group(1).strip()
+    citations = CITATIONS_FIELD.search(text)
+    numbers = [int(value) for value in re.findall(r"\d+", citations.group(1))] if citations else []
+    abstain = ABSTAIN_FIELD.search(text)
+    abstained = bool(abstain and abstain.group(1).lower() == "true")
+    return answer, numbers, abstained
 
 
 def _numbers(value: object) -> list[int]:
@@ -79,6 +98,19 @@ def parse_answer(text: str, hits: Sequence[Hit]) -> Answer:
             text=answer or cleaned,
             cited_chunk_ids=map_citations(numbers, hits),
             abstained=False,
+            raw=text,
+        )
+
+    fields = _extract_fields(cleaned)
+    if fields is not None:
+        answer, numbers, abstained = fields
+        if not numbers:
+            numbers = [int(match) for match in BRACKET.findall(answer)]
+        abstained = abstained or (NOT_ENOUGH in answer.lower() and not numbers)
+        return Answer(
+            text=answer,
+            cited_chunk_ids=() if abstained else map_citations(numbers, hits),
+            abstained=abstained,
             raw=text,
         )
 
