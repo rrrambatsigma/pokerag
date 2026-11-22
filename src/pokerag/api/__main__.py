@@ -19,6 +19,7 @@ from pokerag.core.logging import get_logger
 from pokerag.retrieval.rerank import CrossEncoderReranker
 
 DEFAULT_LADDER = "configs/ladder.yaml"
+DEFAULT_SERVE_CONFIG = "configs/retrieval.serve.yaml"
 LOGGER = get_logger("pokerag.api")
 
 
@@ -70,7 +71,9 @@ def build_app(args: argparse.Namespace):
     if variant.reranker:
         if ladder.reranker is None:
             raise SystemExit("config memakai reranker tetapi blok reranker tidak ada")
-        reranker = CrossEncoderReranker(ladder.reranker, device=args.device)
+        reranker = CrossEncoderReranker(
+            ladder.reranker, device=args.reranker_device or "cuda"
+        )
 
     app = create_app(
         config_path=args.config,
@@ -91,17 +94,22 @@ def build_app(args: argparse.Namespace):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pokerag-api", description=__doc__)
-    parser.add_argument("--config", default=DEFAULT_CONFIG)
+    parser.add_argument("--config", default=DEFAULT_SERVE_CONFIG)
     parser.add_argument("--ladder", default=DEFAULT_LADDER)
     parser.add_argument("--variant", default="B4", help="B0 sampai B6")
     parser.add_argument("--no-generator", action="store_true", help="pakai stub")
     parser.add_argument(
         "--load-in-4bit",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="4-bit NF4 untuk Qwen (default: aktif)",
+        default=False,
+        help="4-bit NF4 untuk Qwen (default: fp16)",
     )
     parser.add_argument("--device", default=None)
+    parser.add_argument(
+        "--reranker-device",
+        default="cuda",
+        help="cuda (default) atau cpu",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)

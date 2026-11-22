@@ -208,11 +208,20 @@ class TorchEmbedder:
             )
         self._torch = torch
         # The revision is pinned in the config so a re-download cannot swap the
-        # weights behind the same model name.
-        self._model = SentenceTransformer(cfg.model, device=cfg.device, revision=cfg.revision)
+        # weights behind the same model name. Load directly in fp16: loading
+        # fp32 first needs ~2.3 GB and OOMs when the generator is already up.
+        # CPU half inference is not reliable; fp32 on CPU keeps the query
+        # encoder compatible without changing the identity hash (dtype stays
+        # float16 in the config, as the index was built).
+        use_fp16 = cfg.dtype == "float16" and cfg.device != "cpu"
+        model_kwargs = {"torch_dtype": torch.float16} if use_fp16 else {}
+        self._model = SentenceTransformer(
+            cfg.model,
+            device=cfg.device,
+            revision=cfg.revision,
+            model_kwargs=model_kwargs,
+        )
         self._model.max_seq_length = cfg.max_seq_length
-        if cfg.dtype == "float16":
-            self._model.half()
         self.texts_embedded = 0
 
     @property

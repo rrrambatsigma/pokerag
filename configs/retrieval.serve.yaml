@@ -1,0 +1,15 @@
+# Serving variant: same retrieval settings, CPU query encoder.
+index: configs/index.serve.yaml
+strategy: heading
+
+top_dense: 20
+top_bm25: 20
+top_k: 5
+rrf_k: 10
+
+weights:
+  dense: 2.0
+  bm25: 1.0
+
+modes: [dense, bm25, hybrid]
+ks: [5, 10]
