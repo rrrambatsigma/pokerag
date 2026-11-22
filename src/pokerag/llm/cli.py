@@ -16,6 +16,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-index", type=int, default=0, help="indeks seed (0..2)")
     parser.add_argument("--limit", type=int, default=None, help="batasi jumlah query")
     parser.add_argument("--device", default=None, help="cuda atau cpu")
+    parser.add_argument(
+        "--mode",
+        choices=("off", "dense", "bm25", "hybrid"),
+        default=None,
+        help="override mode retrieval, dipakai untuk A2",
+    )
+    parser.add_argument(
+        "--rerank",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="override reranker, dipakai untuk A2",
+    )
     parser.add_argument("--out-root", default="artifacts/runs")
     parser.add_argument("--retrieval-config", default="configs/retrieval.v2.yaml")
     args = parser.parse_args(argv)
@@ -27,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
         run_index=args.run_index,
         limit=args.limit,
         device=args.device,
+        mode=args.mode,
+        rerank=args.rerank,
         out_root=args.out_root,
         retrieval_config=args.retrieval_config,
     )

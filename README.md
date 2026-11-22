@@ -340,9 +340,22 @@ Keluaran ada di `artifacts/runs/<variant>-r<index>/`:
 | `manifest.json` | model, revisi, seed, prompt, `index_version`, token, latensi |
 | `requests.jsonl` | trace per permintaan |
 
-Runner memakai dua tahap: retrieval dulu, embedder dilepas, lalu generator
-dimuat. `bge-m3` dan Qwen 1.5B tidak muat bersamaan di 6 GB. Warmup tidak
-dihitung sebagai latensi. Hasil prediksi bisa langsung dinilai:
+Runner memakai dua tahap: retrieval dulu, embedder dan reranker dilepas, lalu
+generator dimuat. `bge-m3`, reranker, dan Qwen 1.5B tidak muat bersamaan di
+6 GB. Warmup tidak dihitung sebagai latensi.
+
+B3 ke atas memakai reranker `BAAI/bge-reranker-v2-m3`: 20 kandidat diambil,
+lalu dipotong ke `top_k`. Untuk A2, mode dan reranker bisa dioverride tanpa
+mengedit config:
+
+```bash
+pokerag-generate --variant B3 --mode dense  --no-rerank ...
+pokerag-generate --variant B3 --mode bm25   --no-rerank ...
+pokerag-generate --variant B3 --mode hybrid --no-rerank ...
+pokerag-generate --variant B3 --mode hybrid ...
+```
+
+Hasil prediksi bisa langsung dinilai:
 
 ```bash
 pokerag-eval generation \

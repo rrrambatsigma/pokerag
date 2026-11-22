@@ -28,6 +28,8 @@ from pokerag.llm.prompts import PromptSet, load_prompt_set
 from pokerag.llm.qwen import QwenGenerator
 from pokerag.retrieval.config import load_retrieval_config
 from pokerag.retrieval.pipeline import Retriever
+from pokerag.retrieval.rerank import CrossEncoderReranker
+from pokerag.retrieval.rerank import Reranker as RerankerLike
 from pokerag.retrieval.types import Hit
 
 DEFAULT_RETRIEVAL = "configs/retrieval.v2.yaml"
@@ -95,8 +97,11 @@ def run_variant(
     device: str | None = None,
     out_root: str | Path = "artifacts/runs",
     retrieval_config: str | Path = DEFAULT_RETRIEVAL,
+    mode: str | None = None,
+    rerank: bool | None = None,
     generator: Generator | None = None,
     retriever: RetrieverLike | None = None,
+    reranker: RerankerLike | None = None,
 ) -> Path:
     ladder_path = Path(ladder_path)
     ladder = load_ladder(ladder_path)
@@ -117,11 +122,25 @@ def run_variant(
         ordered = ordered[:limit]
 
     cfg = load_retrieval_config(Path(retrieval_config))
-    uses_retrieval = variant.retrieval.mode != "off"
+    effective_mode = mode or variant.retrieval.mode
+    if effective_mode not in ("off", "dense", "bm25", "hybrid"):
+        raise ValueError(f"mode tidak dikenal: {effective_mode}")
+    uses_retrieval = effective_mode != "off"
+    use_rerank = (variant.reranker if rerank is None else rerank) and uses_retrieval
+    if use_rerank and ladder.reranker is None:
+        raise ValueError("config memakai reranker tetapi blok reranker tidak ada")
+    candidate_k = (
+        ladder.reranker.candidates
+        if use_rerank and ladder.reranker is not None
+        else variant.retrieval.top_k
+    )
+
     owns_retriever = False
     if uses_retrieval and retriever is None:
         retriever = Retriever(cfg, strategy=variant.retrieval.strategy)
         owns_retriever = True
+    if use_rerank and reranker is None and ladder.reranker is not None:
+        reranker = CrossEncoderReranker(ladder.reranker, device=device)
 
     seed = ladder.sampling.seeds[run_index]
 
@@ -136,22 +155,29 @@ def run_variant(
         index_version = retriever.index_version
         # Warm the embedder before timing; loading bge-m3 takes ~30 s on this
         # machine and must not be charged to the first user query.
-        retriever.search("warmup", mode=variant.retrieval.mode, top_k=1)
+        retriever.search("warmup", mode=effective_mode, top_k=1)
         try:
             for query in ordered:
                 started = time.perf_counter()
-                hits_by_query[query.query_id] = retriever.search(
+                candidates = retriever.search(
                     query.text,
-                    mode=variant.retrieval.mode,
-                    top_k=variant.retrieval.top_k,
+                    mode=effective_mode,
+                    top_k=candidate_k,
+                )
+                hits_by_query[query.query_id] = (
+                    reranker.rerank(query.text, candidates, variant.retrieval.top_k)
+                    if use_rerank and reranker is not None
+                    else candidates
                 )
                 retrieval_ms[query.query_id] = (time.perf_counter() - started) * 1000
         finally:
             if owns_retriever:
                 retriever.close()
                 retriever = None
-                gc.collect()
-                _free_cuda()
+            if use_rerank:
+                reranker = None
+            gc.collect()
+            _free_cuda()
 
     if generator is None:
         generator = QwenGenerator(
@@ -195,7 +221,7 @@ def run_variant(
         snapshot=cfg.index_config().snapshot,
         index_version=index_version,
         strategy=variant.retrieval.strategy,
-        mode=variant.retrieval.mode,
+        mode=effective_mode,
         config_path=ladder_path,
         prompt_path=root / variant.system_prompt,
         queries_path=Path(queries_path),
@@ -216,7 +242,11 @@ def run_variant(
             "prompt_set_version": prompts.version,
             "prompt_user": variant.user_prompt,
             "prompt_fewshot": variant.fewshot,
-            "retrieval_candidates": variant.retrieval.top_k,
+            "retrieval_candidates": candidate_k,
+            "rerank": use_rerank,
+            "reranker_model": ladder.reranker.model_id if ladder.reranker else None,
+            "reranker_revision": ladder.reranker.revision if ladder.reranker else None,
+            "mode_override": mode,
         },
     )
     run_dir = write_run(out_root, manifest, records)
