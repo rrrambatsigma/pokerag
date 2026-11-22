@@ -1,0 +1,53 @@
+{
+  "benchmark": {
+    "n_test_docs": 80,
+    "n_test_entities": 122,
+    "queries": "../pokerag-annotator/data/queries.csv",
+    "queries_sha256": "a3d2e7647696c080c3243ab8a69b293c81079868d6542bd7b766978c8a42f04a"
+  },
+  "corpus": {
+    "chunks_sha256": "abc1c523d2798b48f5c86071ef9704cd7d8213e63bda041782888105e407ed05",
+    "documents_sha256": "bafddbd9747161116f4522536d29f83b65845b831643be83d5959b121e5c1012",
+    "root": "artifacts/corpus/pokerag-corpus-v2"
+  },
+  "counts_by_kind": {
+    "catch_rate": 25,
+    "egg_group": 20,
+    "evolution": 15,
+    "type": 40
+  },
+  "counts_by_variant": {
+    "abstain": 100,
+    "clean": 100,
+    "hard": 100
+  },
+  "exclusions_sha256": "a9618a21c3e204cbb941e989f10a725b57f3c2e11b664da5b0b328776aa61fcf",
+  "format": "sft-v1",
+  "gates": {
+    "copied_items": 0,
+    "entity_collisions": 0,
+    "max_common_chars": 35,
+    "max_common_limit": 50,
+    "ngram": 8,
+    "ok": true,
+    "question_collisions": 0
+  },
+  "items_sha256": "0753b2abb65a28bfc39189150e59fc02d45c526ea4c5c00c00e6c808ea5406ab",
+  "n_examples": {
+    "train": 258,
+    "val": 42
+  },
+  "n_items": 100,
+  "prompt_version": "064e878946e1",
+  "prompts": {
+    "system": "configs/prompts/grounded_system.txt",
+    "user": "configs/prompts/grounded_user.txt"
+  },
+  "quota": {
+    "catch_rate": 25,
+    "egg_group": 20,
+    "evolution": 15,
+    "type": 40
+  },
+  "seed": 7
+}

@@ -40,6 +40,7 @@ pokerag-eval = "pokerag.eval.cli:main"
 pokerag-api = "pokerag.api.__main__:main"
 pokerag-redteam = "pokerag.redteam.cli:main"
 pokerag-generate = "pokerag.llm.cli:main"
+pokerag-sft = "pokerag.sft.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
