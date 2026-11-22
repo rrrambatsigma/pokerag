@@ -54,6 +54,7 @@ class RetrievalRef(Strict):
 
 class AdapterRef(Strict):
     enabled: bool = False
+    path: str | None = None
     reason: str | None = None
 
 
@@ -132,6 +133,8 @@ def _validate_variant(name: str, variant: Variant, root: Path, problems: list[st
                 problems.append(f"{name}: {flag} harus aktif")
     if name == "B5" and not variant.adapter.enabled and not variant.adapter.reason:
         problems.append("B5: adapter nonaktif harus punya alasan")
+    if name == "B5" and variant.adapter.enabled and not variant.adapter.path:
+        problems.append("B5: adapter aktif harus punya path")
     if name == "B6" and not variant.tools:
         problems.append("B6: tools tidak boleh kosong")
 

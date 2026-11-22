@@ -29,7 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "httpx>=0.27"]
-gpu = ["torch>=2.2", "sentence-transformers>=3.0"]
+gpu = ["torch>=2.2", "sentence-transformers>=3.0", "accelerate>=0.34", "bitsandbytes>=0.44", "peft>=0.13"]
 
 [project.scripts]
 pokerag-ingest = "pokerag.ingest.cli:main"
@@ -40,6 +40,7 @@ pokerag-eval = "pokerag.eval.cli:main"
 pokerag-api = "pokerag.api.__main__:main"
 pokerag-redteam = "pokerag.redteam.cli:main"
 pokerag-generate = "pokerag.llm.cli:main"
+pokerag-sft = "pokerag.sft.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

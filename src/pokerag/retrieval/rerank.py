@@ -32,7 +32,8 @@ class CrossEncoderReranker:
 
         target = device or config.device
         model_kwargs: dict[str, object] = {}
-        dtype = getattr(torch, config.dtype) if config.dtype else None
+        # CPU half inference is not reliably supported; use float32 there.
+        dtype = getattr(torch, config.dtype) if config.dtype and not target.startswith("cpu") else None
         if dtype is not None:
             model_kwargs["torch_dtype"] = dtype
 

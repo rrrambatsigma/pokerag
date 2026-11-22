@@ -44,7 +44,8 @@ def test_ladder_encodes_the_intended_layers() -> None:
         variant = configs[name]
         assert variant.planner and variant.sufficiency and variant.verifier
 
-    assert configs["B5"].adapter.enabled is False
+    assert configs["B5"].adapter.enabled is True
+    assert configs["B5"].adapter.path and "{seed}" in configs["B5"].adapter.path
     assert configs["B5"].adapter.reason
     assert configs["B6"].tools == ["document_version", "generation_check"]
 

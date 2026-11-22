@@ -395,9 +395,27 @@ cd frontend && npm run dev
 | `POST /api/chat` | `{message, settings}` → satu pesan asisten dengan sitasi |
 
 Settings UI dipetakan ke mode: dense+bm25 = `hybrid`, salah satu = `dense` atau
-`bm25`, keduanya mati = `off` (tanpa retrieval, posisi B0). Selama generator
-Qwen belum ada, `StubGenerator` mengembalikan jawaban deterministik dengan
-sitasi dari hasil retrieval. Kontraknya sama dengan generator asli.
+`bm25`, keduanya mati = `off` (tanpa retrieval, posisi B0).
+
+Untuk demo, API menjalankan B4 dengan Qwen **fp16**, sama seperti eksperimen.
+bge-m3 untuk query berjalan di CPU, reranker di GPU, sehingga total VRAM sekitar
+4,4 GB:
+
+```bash
+pokerag-api --variant B4 --port 8000
+# tanpa GPU:
+pokerag-api --no-generator
+# opsi hemat memori, kualitas entitas menurun:
+pokerag-api --variant B4 --load-in-4bit
+```
+
+Retrieval di-warmup saat startup supaya chat pertama tidak menunggu pemuatan
+embedder. UI memanggil `/api/chat`; jika API mati, store kembali ke mock dan
+menulis peringatan di konsol. Proxy Vite bisa diarahkan lewat
+`VITE_API_TARGET` (default `http://127.0.0.1:8000`).
+
+Catatan: 4-bit pernah dicoba dan membuat model menukar Charmander dengan
+Bulbasaur. Karena itu fp16 menjadi default; rinciannya di ADR-0019.
 
 ## UI demo — chat, sitasi, setelan
 

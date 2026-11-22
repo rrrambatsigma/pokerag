@@ -152,6 +152,8 @@ class QwenGenerator:
         seed: int | None = None,
         use_evidence: bool = True,
         device: str | None = None,
+        load_in_4bit: bool = False,
+        adapter_path: str | None = None,
     ) -> None:
         try:
             import torch
@@ -170,14 +172,38 @@ class QwenGenerator:
         self._use_evidence = use_evidence
         self._target = target
 
-        dtype = getattr(torch, model.dtype) if model.dtype else None
         self._tokenizer = AutoTokenizer.from_pretrained(
             model.model_id, revision=model.revision
         )
-        self._model = AutoModelForCausalLM.from_pretrained(
-            model.model_id, revision=model.revision, dtype=dtype
-        )
-        self._model.to(target)
+        if load_in_4bit:
+            if not target.startswith("cuda"):
+                raise RuntimeError("4-bit quantization requires CUDA")
+            from transformers import BitsAndBytesConfig
+
+            quant = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+            )
+            self._model = AutoModelForCausalLM.from_pretrained(
+                model.model_id,
+                revision=model.revision,
+                quantization_config=quant,
+                device_map={"": target},
+            )
+        else:
+            dtype = getattr(torch, model.dtype) if model.dtype else None
+            self._model = AutoModelForCausalLM.from_pretrained(
+                model.model_id, revision=model.revision, dtype=dtype
+            )
+            self._model.to(target)
+        if adapter_path is not None:
+            try:
+                from peft import PeftModel
+            except ImportError as error:  # pragma: no cover - depends on local install
+                raise RuntimeError("adapter needs peft: uv sync --extra gpu") from error
+            self._model = PeftModel.from_pretrained(self._model, str(adapter_path))
         self._model.eval()
 
     @property

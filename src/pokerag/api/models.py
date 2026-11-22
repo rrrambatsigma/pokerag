@@ -70,6 +70,7 @@ class HealthResponse(BaseModel):
     strategy: str
     collection: str
     generator: str
+    variant: str
     modes: list[str]
 
 
