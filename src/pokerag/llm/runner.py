@@ -24,8 +24,10 @@ from pokerag.core.jsonl import write_jsonl
 from pokerag.eval.qrels import load_queries
 from pokerag.llm.base import Answer, Generator
 from pokerag.llm.config import Ladder, load_ladder
+from pokerag.llm.planner import plan_subqueries
 from pokerag.llm.prompts import PromptSet, load_prompt_set
 from pokerag.llm.qwen import QwenGenerator
+from pokerag.llm.verify import QwenVerifier, VerifyingGenerator
 from pokerag.retrieval.config import load_retrieval_config
 from pokerag.retrieval.pipeline import Retriever
 from pokerag.retrieval.rerank import CrossEncoderReranker
@@ -99,6 +101,8 @@ def run_variant(
     retrieval_config: str | Path = DEFAULT_RETRIEVAL,
     mode: str | None = None,
     rerank: bool | None = None,
+    planner: bool | None = None,
+    verifier: bool | None = None,
     generator: Generator | None = None,
     retriever: RetrieverLike | None = None,
     reranker: RerankerLike | None = None,
@@ -126,6 +130,8 @@ def run_variant(
     if effective_mode not in ("off", "dense", "bm25", "hybrid"):
         raise ValueError(f"mode tidak dikenal: {effective_mode}")
     uses_retrieval = effective_mode != "off"
+    use_planner = variant.planner if planner is None else planner
+    use_verifier = variant.verifier if verifier is None else verifier
     use_rerank = (variant.reranker if rerank is None else rerank) and uses_retrieval
     if use_rerank and ladder.reranker is None:
         raise ValueError("config memakai reranker tetapi blok reranker tidak ada")
@@ -159,15 +165,22 @@ def run_variant(
         try:
             for query in ordered:
                 started = time.perf_counter()
-                candidates = retriever.search(
-                    query.text,
-                    mode=effective_mode,
-                    top_k=candidate_k,
+                subqueries = (
+                    plan_subqueries(query.text) if use_planner else [query.text]
                 )
+                candidates: list[Hit] = []
+                seen: set[str] = set()
+                for subquery in subqueries:
+                    for hit in retriever.search(
+                        subquery, mode=effective_mode, top_k=candidate_k
+                    ):
+                        if hit.chunk_id not in seen:
+                            seen.add(hit.chunk_id)
+                            candidates.append(hit)
                 hits_by_query[query.query_id] = (
                     reranker.rerank(query.text, candidates, variant.retrieval.top_k)
                     if use_rerank and reranker is not None
-                    else candidates
+                    else candidates[: variant.retrieval.top_k]
                 )
                 retrieval_ms[query.query_id] = (time.perf_counter() - started) * 1000
         finally:
@@ -180,7 +193,7 @@ def run_variant(
             _free_cuda()
 
     if generator is None:
-        generator = QwenGenerator(
+        base = QwenGenerator(
             ladder.base_model,
             ladder.sampling,
             prompts,
@@ -188,6 +201,27 @@ def run_variant(
             use_evidence=uses_retrieval,
             device=device,
         )
+        if use_verifier:
+            if ladder.verifier is None:
+                raise ValueError("config memakai verifier tetapi blok verifier tidak ada")
+            verifier_system = (root / ladder.verifier.system_prompt).read_text(
+                encoding="utf-8"
+            )
+            verifier_user = (root / ladder.verifier.user_prompt).read_text(
+                encoding="utf-8"
+            )
+            repair_user = (root / ladder.verifier.repair_user_prompt).read_text(
+                encoding="utf-8"
+            )
+            generator = VerifyingGenerator(
+                base,
+                QwenVerifier(base, verifier_system, verifier_user),
+                system_prompt=base.system_text,
+                repair_template=repair_user,
+                max_repairs=ladder.verifier.max_repairs,
+            )
+        else:
+            generator = base
 
     predictions: list[dict] = []
     records: list[RequestRecord] = []
@@ -203,6 +237,8 @@ def run_variant(
                 "text": answer.text,
                 "abstained": answer.abstained,
                 "citations": _citation_payload(answer, hits),
+                "verified": answer.verified,
+                "repairs": answer.repairs,
             }
         )
         records.append(
@@ -247,6 +283,11 @@ def run_variant(
             "reranker_model": ladder.reranker.model_id if ladder.reranker else None,
             "reranker_revision": ladder.reranker.revision if ladder.reranker else None,
             "mode_override": mode,
+            "planner": use_planner,
+            "verifier": use_verifier,
+            "verifier_max_repairs": (
+                ladder.verifier.max_repairs if ladder.verifier else 0
+            ),
         },
     )
     run_dir = write_run(out_root, manifest, records)

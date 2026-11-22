@@ -355,6 +355,18 @@ pokerag-generate --variant B3 --mode hybrid --no-rerank ...
 pokerag-generate --variant B3 --mode hybrid ...
 ```
 
+B4 ke atas menambahkan planner dan verifier. Planner memecah pertanyaan
+perbandingan menjadi dua sub-query retrieval; verifier memeriksa klaim lalu
+memberi satu kesempatan perbaikan sebelum abstain. Untuk atribusi:
+
+```bash
+pokerag-generate --variant B4 --no-verifier ...   # planner saja
+pokerag-generate --variant B4 --no-planner ...    # verifier saja
+```
+
+Pada q0005 dan q0009, planner saja masih salah, sedangkan verifier saja
+memperbaiki keduanya dengan satu repair. Rinciannya di ADR-0018.
+
 Hasil prediksi bisa langsung dinilai:
 
 ```bash

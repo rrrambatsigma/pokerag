@@ -1,0 +1,12 @@
+EVIDENCE
+{evidence}
+
+QUESTION
+{question}
+
+PREVIOUS ANSWER
+{answer}
+
+The verifier rejected the previous answer: {reason}
+
+Re-check each entity against the evidence, then answer again with the same JSON schema.

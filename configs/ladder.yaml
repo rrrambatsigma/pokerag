@@ -31,6 +31,13 @@ reranker:
   device: cuda
   candidates: 20
 
+# Verifier B4-B6: cek klaim terhadap evidence, lalu satu kali perbaikan.
+verifier:
+  system_prompt: configs/prompts/verify_system.txt
+  user_prompt: configs/prompts/verify_user.txt
+  repair_user_prompt: configs/prompts/repair_user.txt
+  max_repairs: 1
+
 configs:
   B0:
     system_prompt: configs/prompts/b0_system.txt

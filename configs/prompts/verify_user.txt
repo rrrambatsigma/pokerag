@@ -1,0 +1,8 @@
+EVIDENCE
+{evidence}
+
+QUESTION
+{question}
+
+ANSWER
+{answer}

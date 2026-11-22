@@ -10,6 +10,13 @@ from pokerag.retrieval.types import Hit
 
 
 @dataclass(frozen=True)
+class Completion:
+    text: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+
+
+@dataclass(frozen=True)
 class Answer:
     """What every generator must return, regardless of backend."""
 
@@ -19,6 +26,8 @@ class Answer:
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     raw: str | None = None
+    verified: bool | None = None
+    repairs: int = 0
 
 
 class Generator(Protocol):

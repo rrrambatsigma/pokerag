@@ -39,6 +39,13 @@ class RerankerRef(Strict):
     candidates: int = 20
 
 
+class VerifierRef(Strict):
+    system_prompt: str
+    user_prompt: str
+    repair_user_prompt: str
+    max_repairs: int = 1
+
+
 class RetrievalRef(Strict):
     mode: Literal["off", "dense", "bm25", "hybrid"]
     strategy: Literal["fixed", "heading", "hierarchical"]
@@ -68,6 +75,7 @@ class Ladder(Strict):
     base_model: ModelRef
     sampling: SamplingRef
     reranker: RerankerRef | None = None
+    verifier: VerifierRef | None = None
     configs: dict[str, Variant]
 
     def require_pinned(self) -> None:
@@ -135,6 +143,7 @@ def load_ladder(path: str | Path) -> Ladder:
     ladder = Ladder.model_validate(data)
 
     problems: list[str] = []
+    root = ladder_path.resolve().parent.parent
     if tuple(ladder.configs) != EXPECTED:
         problems.append(
             f"configs harus berurutan {EXPECTED}, ditemukan {tuple(ladder.configs)}"
@@ -151,7 +160,21 @@ def load_ladder(path: str | Path) -> Ladder:
                     f"{name}: reranker.candidates lebih kecil dari top_k"
                 )
 
-    root = ladder_path.resolve().parent.parent
+    uses_verifier = any(variant.verifier for variant in ladder.configs.values())
+    if uses_verifier:
+        if ladder.verifier is None:
+            problems.append("config memakai verifier tetapi blok verifier tidak ada")
+        else:
+            for relative in (
+                ladder.verifier.system_prompt,
+                ladder.verifier.user_prompt,
+                ladder.verifier.repair_user_prompt,
+            ):
+                if not (root / relative).is_file():
+                    problems.append(f"prompt verifier tidak ada: {relative}")
+            if ladder.verifier.max_repairs < 0:
+                problems.append("verifier.max_repairs tidak boleh negatif")
+
     for name in EXPECTED:
         variant = ladder.configs.get(name)
         if variant is None:

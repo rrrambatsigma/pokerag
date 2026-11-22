@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Sequence
 
-from pokerag.llm.base import Answer
+from pokerag.llm.base import Answer, Completion
 from pokerag.llm.config import ModelRef, SamplingRef
 from pokerag.llm.prompts import PromptSet, render_system, render_user
 from pokerag.retrieval.types import Hit
@@ -180,12 +180,19 @@ class QwenGenerator:
         self._model.to(target)
         self._model.eval()
 
-    def generate(self, question: str, evidence: Sequence[Hit]) -> Answer:
-        messages = build_messages(
-            self._prompt_set, question, evidence, use_evidence=self._use_evidence
-        )
+    @property
+    def system_text(self) -> str:
+        return render_system(self._prompt_set)
+
+    def complete(
+        self,
+        messages: Sequence[dict[str, str]],
+        *,
+        max_new_tokens: int | None = None,
+    ) -> Completion:
+        """Run one chat completion and return the raw text plus token counts."""
         prompt = self._tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            list(messages), tokenize=False, add_generation_prompt=True
         )
         inputs = self._tokenizer(prompt, return_tensors="pt").to(self._target)
 
@@ -194,7 +201,7 @@ class QwenGenerator:
         with self._torch.inference_mode():
             output = self._model.generate(
                 **inputs,
-                max_new_tokens=self._sampling.max_new_tokens,
+                max_new_tokens=max_new_tokens or self._sampling.max_new_tokens,
                 do_sample=do_sample,
                 temperature=self._sampling.temperature if do_sample else None,
                 top_p=self._sampling.top_p if do_sample else None,
@@ -204,12 +211,23 @@ class QwenGenerator:
         prompt_tokens = int(inputs["input_ids"].shape[1])
         completion_tokens = int(output.shape[1]) - prompt_tokens
         raw = self._tokenizer.decode(output[0][prompt_tokens:], skip_special_tokens=True)
-        answer = parse_answer(raw, evidence if self._use_evidence else [])
+        return Completion(
+            text=raw,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+
+    def generate(self, question: str, evidence: Sequence[Hit]) -> Answer:
+        messages = build_messages(
+            self._prompt_set, question, evidence, use_evidence=self._use_evidence
+        )
+        completion = self.complete(messages)
+        answer = parse_answer(completion.text, evidence if self._use_evidence else [])
         return Answer(
             text=answer.text,
             cited_chunk_ids=answer.cited_chunk_ids,
             abstained=answer.abstained,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            raw=raw,
+            prompt_tokens=completion.prompt_tokens,
+            completion_tokens=completion.completion_tokens,
+            raw=completion.text,
         )

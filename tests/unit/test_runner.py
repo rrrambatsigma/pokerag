@@ -268,3 +268,35 @@ def test_mode_override_changes_retrieval_and_manifest(tmp_path: Path) -> None:
     assert retriever.calls[-1] == ("What type is Cloyster?", "bm25", 5)
     assert manifest["mode"] == "bm25"
     assert manifest["extra"]["mode_override"] == "bm25"
+
+
+def multi_query_file(tmp_path: Path) -> Path:
+    path = tmp_path / "multi.csv"
+    path.write_text(
+        "query_id,text,slice\n"
+        "q0002,Are Treecko and Mudkip both in the Monster egg group?,multi_hop\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_b4_planner_retrieves_each_entity(tmp_path: Path) -> None:
+    retriever = FakeRetrieverMany()
+
+    run_dir = run_variant(
+        ladder_path=LADDER,
+        variant_name="B4",
+        queries_path=multi_query_file(tmp_path),
+        limit=1,
+        out_root=tmp_path / "runs",
+        generator=FakeGenerator(),
+        retriever=retriever,
+        rerank=False,
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    queries = [call[0] for call in retriever.calls]
+
+    assert "What egg group is Treecko?" in queries
+    assert "What egg group is Mudkip?" in queries
+    assert manifest["extra"]["planner"] is True
