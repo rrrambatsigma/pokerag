@@ -39,6 +39,13 @@ def build_app(args: argparse.Namespace):
         root / variant.user_prompt,
         root / variant.fewshot if variant.fewshot else None,
     )
+    adapter_path: str | None = None
+    if variant.adapter.enabled and variant.adapter.path:
+        candidate = (root / variant.adapter.path.format(seed=ladder.sampling.seeds[0])).resolve()
+        if not candidate.exists():
+            raise SystemExit(f"adapter tidak ditemukan: {candidate}")
+        adapter_path = str(candidate)
+
     base = QwenGenerator(
         ladder.base_model,
         ladder.sampling,
@@ -46,6 +53,7 @@ def build_app(args: argparse.Namespace):
         use_evidence=variant.retrieval.mode != "off",
         device=args.device,
         load_in_4bit=args.load_in_4bit,
+        adapter_path=adapter_path,
     )
 
     generator = base

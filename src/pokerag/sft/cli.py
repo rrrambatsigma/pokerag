@@ -403,11 +403,23 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--queries", default=DEFAULT_QUERIES)
     check.add_argument("--dev-qrels", default=DEFAULT_DEV_QRELS)
 
+    train = sub.add_parser("train", help="fine-tune the B5 adapter with QLoRA")
+    from pokerag.sft.train import build_parser
+
+    build_parser(train)
+
     args = parser.parse_args(argv)
     if args.command == "build":
         return cmd_build(args)
     if args.command == "check":
         return cmd_check(args)
+    if args.command == "train":
+        from pokerag.sft.train import run
+
+        args.out = args.out.format(seed=args.seed)
+        summary = run(args)
+        print(json.dumps(summary, indent=2))
+        return 0
     return 0
 
 

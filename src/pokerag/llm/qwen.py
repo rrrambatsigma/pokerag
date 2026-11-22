@@ -153,6 +153,7 @@ class QwenGenerator:
         use_evidence: bool = True,
         device: str | None = None,
         load_in_4bit: bool = False,
+        adapter_path: str | None = None,
     ) -> None:
         try:
             import torch
@@ -197,6 +198,12 @@ class QwenGenerator:
                 model.model_id, revision=model.revision, dtype=dtype
             )
             self._model.to(target)
+        if adapter_path is not None:
+            try:
+                from peft import PeftModel
+            except ImportError as error:  # pragma: no cover - depends on local install
+                raise RuntimeError("adapter needs peft: uv sync --extra gpu") from error
+            self._model = PeftModel.from_pretrained(self._model, str(adapter_path))
         self._model.eval()
 
     @property

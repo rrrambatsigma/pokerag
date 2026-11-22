@@ -20,6 +20,7 @@ from pokerag.bench.manifest import (
     build_manifest,
     write_run,
 )
+from pokerag.core.hashing import sha256_file
 from pokerag.core.jsonl import write_jsonl
 from pokerag.eval.qrels import load_queries
 from pokerag.llm.base import Answer, Generator
@@ -192,6 +193,13 @@ def run_variant(
             gc.collect()
             _free_cuda()
 
+    adapter_path: str | None = None
+    if variant.adapter.enabled and variant.adapter.path:
+        candidate = (root / variant.adapter.path.format(seed=seed)).resolve()
+        if not candidate.exists():
+            raise FileNotFoundError(f"adapter tidak ditemukan: {candidate}")
+        adapter_path = str(candidate)
+
     if generator is None:
         base = QwenGenerator(
             ladder.base_model,
@@ -200,6 +208,7 @@ def run_variant(
             seed=seed,
             use_evidence=uses_retrieval,
             device=device,
+            adapter_path=adapter_path,
         )
         if use_verifier:
             if ladder.verifier is None:
@@ -287,6 +296,14 @@ def run_variant(
             "verifier": use_verifier,
             "verifier_max_repairs": (
                 ladder.verifier.max_repairs if ladder.verifier else 0
+            ),
+            "adapter": variant.adapter.path,
+            "adapter_path": adapter_path,
+            "adapter_sha256": (
+                sha256_file(Path(adapter_path) / "adapter_model.safetensors")
+                if adapter_path
+                and (Path(adapter_path) / "adapter_model.safetensors").exists()
+                else None
             ),
         },
     )

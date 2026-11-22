@@ -102,9 +102,10 @@ configs:
     sufficiency: true
     verifier: true
     adapter:
-      enabled: false
-      reason: "allow_ft_training=false untuk 386 dokumen; butuh dataset berlisensi lain atau B5 dinyatakan tidak dijalankan."
-    notes: "B4 dengan adapter LoRA/QLoRA pada base yang sama, bila lisensi mengizinkan."
+      enabled: true
+      path: "artifacts/adapters/B5-r{seed}"
+      reason: "Data training dari fakta, bukan teks korpus; lihat ADR-0020. Adapter harus dilatih per seed sebelum B5 dijalankan."
+    notes: "B4 dengan adapter LoRA/QLoRA pada base yang sama. Adapter dilatih oleh `pokerag-sft train`; runner memakai path dengan {seed} terisi."
 
   B6:
     system_prompt: configs/prompts/grounded_system.txt
