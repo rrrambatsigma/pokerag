@@ -14,6 +14,9 @@ import json
 import sys
 from pathlib import Path
 
+import pyarrow.parquet as pq
+
+from pokerag.core.hashing import sha256_file
 from pokerag.core.jsonl import atomic_write_text, read_jsonl, write_json
 from pokerag.eval.generation import (
     Judgment,
@@ -23,6 +26,8 @@ from pokerag.eval.generation import (
     render_markdown as render_generation_markdown,
 )
 from pokerag.eval.metrics import evaluate_gold, render_markdown
+from pokerag.eval.pool import METHODS, build_pool
+from pokerag.eval.pool import write as write_pool
 from pokerag.eval.qrels import (
     POLICIES,
     build_gold,
@@ -32,11 +37,16 @@ from pokerag.eval.qrels import (
     summary,
     write_gold,
 )
+from pokerag.llm.config import load_ladder
 from pokerag.retrieval.config import load_retrieval_config
 from pokerag.retrieval.pipeline import Retriever
+from pokerag.retrieval.rerank import CrossEncoderReranker
 from pokerag.retrieval.types import MODES
 
 DEFAULT_CONFIG = "configs/retrieval.v2.yaml"
+DEFAULT_LADDER = "configs/ladder.yaml"
+DEFAULT_QUERIES = "../pokerag-annotator/data/queries.csv"
+DEFAULT_POOL = "artifacts/pool"
 
 
 def _utf8_stdout() -> None:
@@ -212,6 +222,75 @@ def cmd_generation(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def cmd_pool(args: argparse.Namespace) -> int:
+    cfg = load_retrieval_config(Path(args.config))
+    ladder = load_ladder(Path(args.ladder))
+    strategy = args.strategy or cfg.strategy
+    queries = load_queries(Path(args.queries))
+    pairs = [(query_id, meta.text) for query_id, meta in queries.items()]
+    if args.limit:
+        pairs = pairs[: args.limit]
+
+    documents = pq.read_table(
+        cfg.index_config().snapshot_dir / "documents.parquet",
+        columns=["doc_id", "revid"],
+    ).to_pylist()
+    revid_by_doc = {str(row["doc_id"]): int(row["revid"] or 0) for row in documents}
+
+    candidates = args.candidates or (
+        ladder.reranker.candidates if ladder.reranker else 20
+    )
+    with Retriever(cfg, strategy=strategy) as retriever:
+        reranker = CrossEncoderReranker(ladder.reranker, device=args.device)
+        records = build_pool(
+            pairs,
+            lambda query, mode, top_k: retriever.search(query, mode=mode, top_k=top_k),
+            lambda query, hits, top_k: reranker.rerank(query, hits, top_k),
+            depth=args.depth,
+            candidates=candidates,
+            seed=args.seed,
+            revid_by_doc=revid_by_doc,
+        )
+        payload = write_pool(
+            Path(args.out_dir),
+            records,
+            depth=args.depth,
+            seed=args.seed,
+            meta={
+                "strategy": strategy,
+                "collection": retriever.collection,
+                "index_version": retriever.index_version,
+                "annotation_rule": args.annotation_rule,
+                "candidates": candidates,
+                "queries": str(args.queries),
+                "queries_sha256": sha256_file(Path(args.queries)),
+                "config": str(args.config),
+                "config_sha256": sha256_file(Path(args.config)),
+                "ladder": str(args.ladder),
+                "ladder_sha256": sha256_file(Path(args.ladder)),
+            },
+        )
+
+    print(
+        f"queries={payload['n_queries']} passages={payload['n_passages']} "
+        f"per_query={payload['passages_per_query']} depth={payload['depth']}"
+    )
+    print("metode      " + " ".join(f"{method:>10s}" for method in METHODS))
+    print(
+        "ditemukan   "
+        + " ".join(f"{payload['retrieved_by_method'][m]:10d}" for m in METHODS)
+    )
+    print(
+        "eksklusif   "
+        + " ".join(f"{payload['exclusive_by_method'][m]:10d}" for m in METHODS)
+    )
+    print(f"pool: {Path(args.out_dir) / 'pool.jsonl'}")
+    print(f"manifest: {Path(args.out_dir) / 'manifest.json'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pokerag-eval", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -252,8 +331,23 @@ def main(argv: list[str] | None = None) -> int:
     generation.add_argument("--docs", default="docs/experiments/generation.md")
     generation.add_argument("--no-docs", action="store_true")
 
+    pool = sub.add_parser("pool", help="bangun pool anotasi 4 metode A2")
+    pool.add_argument("--queries", default=DEFAULT_QUERIES)
+    pool.add_argument("--config", default=DEFAULT_CONFIG)
+    pool.add_argument("--ladder", default=DEFAULT_LADDER)
+    pool.add_argument("--strategy", default=None)
+    pool.add_argument("--depth", type=int, default=10, help="top-k per metode")
+    pool.add_argument("--candidates", type=int, default=None, help="kandidat hybrid untuk rerank")
+    pool.add_argument("--seed", type=int, default=7)
+    pool.add_argument("--out-dir", default=DEFAULT_POOL)
+    pool.add_argument("--device", default="cuda")
+    pool.add_argument("--annotation-rule", default="v3")
+    pool.add_argument("--limit", type=int, default=None)
+
     args = parser.parse_args(argv)
     _utf8_stdout()
+    if args.command == "pool":
+        return cmd_pool(args)
     if args.command == "build":
         return cmd_build(args)
     if args.command == "score":
